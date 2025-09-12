@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle Financeiro Familiar</title>
+    
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --secondary-color: #f5f7fa;
+            --text-color: #333;
+            --border-color: #ddd;
+            --danger-color: #d9534f;
+            --success-color: #5cb85c;
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px var(--shadow-color);
+        }
+
+        h1, h2 {
+            color: var(--primary-color);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 30px;
+        }
+
+        .form-section, .data-section {
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #fff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        button {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            background-color: var(--primary-color);
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background-color: #357abd;
+            transform: translateY(-2px);
+        }
+
+        button#export-pdf-btn {
+            background-color: var(--success-color);
+        }
+        
+        button#export-pdf-btn:hover {
+            background-color: #4a934a;
+        }
+        
+        #expense-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        #expense-table th, #expense-table td {
+            border: 1px solid var(--border-color);
+            padding: 12px;
+            text-align: left;
+        }
+
+        #expense-table th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        #expense-table tr:nth-child(even) {
+            background-color: var(--secondary-color);
+        }
+
+        .delete-btn {
+            background-color: var(--danger-color);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .delete-btn:hover {
+            background-color: #c9302c;
+        }
+        
+        .chart-container {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+        }
+        
+        .total-expenses {
+            text-align: right;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 15px;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Painel de Controle Financeiro</h1>
+
+        <div class="main-layout">
+            <div class="form-section">
+                <h2>Lançar Nova Despesa</h2>
+                <form id="expense-form">
+                    <div class="form-group">
+                        <label for="expense-date">Data</label>
+                        <input type="date" id="expense-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-description">Descrição</label>
+                        <input type="text" id="expense-description" placeholder="Ex: Compras no supermercado" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-category">Categoria</label>
+                        <select id="expense-category" required>
+                            <option value="">Selecione uma categoria</option>
+                            <option value="Alimentação">Alimentação</option>
+                            <option value="Transporte">Transporte</option>
+                            <option value="Moradia">Moradia</option>
+                            <option value="Lazer">Lazer</option>
+                            <option value="Saúde">Saúde</option>
+                            <option value="Educação">Educação</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expense-amount">Valor (R$)</label>
+                        <input type="number" id="expense-amount" placeholder="Ex: 150.50" step="0.01" min="0" required>
+                    </div>
+                    <button type="submit">Adicionar Despesa</button>
+                </form>
+            </div>
+
+            <div class="data-section">
+                <h2>Despesas Lançadas</h2>
+                <div style="overflow-x:auto;">
+                    <table id="expense-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Valor (R$)</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expense-list">
+                            </tbody>
+                    </table>
+                </div>
+                 <div class="total-expenses" id="total-expenses">
+                    Total: R$ 0,00
+                </div>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Despesas por Categoria</h2>
+            <canvas id="expense-chart"></canvas>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button id="export-pdf-btn">Exportar para PDF</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const expenseForm = document.getElementById('expense-form');
+            const expenseList = document.getElementById('expense-list');
+            const totalExpensesEl = document.getElementById('total-expenses');
+            const exportPdfBtn = document.getElementById('export-pdf-btn');
+            
+            let expenses = JSON.parse(localStorage.getItem('expenses')) || [];
+            let expenseChart;
+
+            // Função para renderizar as despesas na tabela
+            const renderExpenses = () => {
+                expenseList.innerHTML = '';
+                let total = 0;
+                
+                if (expenses.length === 0) {
+                    expenseList.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhuma despesa lançada.</td></tr>';
+                    totalExpensesEl.textContent = 'Total: R$ 0,00';
+                    return;
+                }
+
+                expenses.forEach((expense, index) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(expense.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
+                        <td>${expense.description}</td>
+                        <td>${expense.category}</td>
+                        <td>R$ ${expense.amount.toFixed(2).replace('.', ',')}</td>
+                        <td><button class="delete-btn" data-index="${index}">Excluir</button></td>
+                    `;
+                    expenseList.appendChild(row);
+                    total += expense.amount;
+                });
+                
+                totalExpensesEl.textContent = `Total: R$ ${total.toFixed(2).replace('.', ',')}`;
+            };
+
+            // Função para atualizar o gráfico
+            const updateChart = () => {
+                const categories = [...new Set(expenses.map(exp => exp.category))];
+                const data = categories.map(category => {
+                    return expenses
+                        .filter(exp => exp.category === category)
+                        .reduce((sum, exp) => sum + exp.amount, 0);
+                });
+
+                const backgroundColors = [
+                    'rgba(74, 144, 226, 0.7)',
+                    'rgba(245, 166, 35, 0.7)',
+                    'rgba(248, 231, 28, 0.7)',
+                    'rgba(126, 211, 33, 0.7)',
+                    'rgba(80, 227, 194, 0.7)',
+                    'rgba(189, 16, 224, 0.7)',
+                    'rgba(208, 2, 27, 0.7)'
+                ];
+                
+                const borderColors = backgroundColors.map(color => color.replace('0.7', '1'));
+
+                const chartData = {
+                    labels: categories,
+                    datasets: [{
+                        label: 'Despesas por Categoria',
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 1
+                    }]
+                };
+
+                const ctx = document.getElementById('expense-chart').getContext('2d');
+                
+                if (expenseChart) {
+                    expenseChart.destroy();
+                }
+                
+                expenseChart = new Chart(ctx, {
+                    type: 'pie', // Pode ser 'bar', 'line', etc.
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                            },
+                            title: {
+                                display: true,
+                                text: 'Distribuição de Despesas'
+                            }
+                        }
+                    }
+                });
+            };
+
+            // Função para salvar no localStorage
+            const saveExpenses = () => {
+                localStorage.setItem('expenses', JSON.stringify(expenses));
+            };
+
+            // Event listener para adicionar despesa
+            expenseForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+
+                const date = document.getElementById('expense-date').value;
+                const description = document.getElementById('expense-description').value;
+                const category = document.getElementById('expense-category').value;
+                const amount = parseFloat(document.getElementById('expense-amount').value);
+                
+                if (date && description && category && !isNaN(amount) && amount > 0) {
+                    expenses.push({ date, description, category, amount });
+                    expenses.sort((a, b) => new Date(a.date) - new Date(b.date)); // Ordena por data
+                    
+                    saveExpenses();
+                    renderExpenses();
+                    updateChart();
+                    
+                    expenseForm.reset();
+                } else {
+                    alert('Por favor, preencha todos os campos corretamente.');
+                }
+            });
+
+            // Event listener para excluir despesa
+            expenseList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('delete-btn')) {
+                    const index = e.target.getAttribute('data-index');
+                    if(confirm('Tem certeza que deseja excluir esta despesa?')) {
+                        expenses.splice(index, 1);
+                        saveExpenses();
+                        renderExpenses();
+                        updateChart();
+                    }
+                }
+            });
+            
+            // Event listener para exportar PDF
+            exportPdfBtn.addEventListener('click', () => {
+                if (expenses.length === 0) {
+                    alert('Não há despesas para exportar.');
+                    return;
+                }
+                
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+                
+                doc.setFontSize(18);
+                doc.text('Relatório de Despesas Familiares', 14, 22);
+                
+                const tableColumn = ["Data", "Descrição", "Categoria", "Valor (R$)"];
+                const tableRows = [];
+
+                expenses.forEach(expense => {
+                    const expenseData = [
+                        new Date(expense.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+                        expense.description,
+                        expense.category,
+                        expense.amount.toFixed(2).replace('.', ',')
+                    ];
+                    tableRows.push(expenseData);
+                });
+                
+                const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+                tableRows.push(["", "", "Total:", total.toFixed(2).replace('.', ',')]);
+
+                doc.autoTable({
+                    head: [tableColumn],
+                    body: tableRows,
+                    startY: 30,
+                    theme: 'striped',
+                    headStyles: { fillColor: [74, 144, 226] }
+                });
+
+                doc.save('relatorio_despesas.pdf');
+            });
+
+            // Inicialização
+            renderExpenses();
+            updateChart();
+        });
+    </script>
+
+</body>
+</html>
