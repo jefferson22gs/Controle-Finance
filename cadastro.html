@@ -43,7 +43,11 @@
                 messageDiv.textContent = 'A senha precisa ter no mínimo 6 caracteres.';
                 messageDiv.className = "text-center text-sm text-red-400 pt-2 h-4";
             } else {
-                const { error } = await supabase.auth.signUp({ email, password });
+                const { error } = await supabaseClient.auth.signUp({
+  email,
+  password
+});
+
                 if (error) {
                     messageDiv.textContent = 'Erro ao cadastrar: ' + error.message;
                     messageDiv.className = "text-center text-sm text-red-400 pt-2 h-4";
@@ -58,4 +62,5 @@
         });
     </script>
 </body>
+
 </html>
