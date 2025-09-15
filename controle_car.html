@@ -858,35 +858,33 @@
             };
 
             const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-                // Validações iniciais (Chaves, Consumo, etc.)
+                // Validações iniciais
                 if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY.includes('SUA_CHAVE')) {
                     showToast('Chave da API TollGuru não configurada.', 'error'); return;
                 }
                 if (!MAPBOX_ACCESS_TOKEN || MAPBOX_ACCESS_TOKEN.includes('SEU_ACCESS_TOKEN')) {
                     showToast('Access Token do Mapbox não configurado.', 'error'); return;
                 }
-                const consumption = calculateAverageConsumption();
-                if (consumption <= 0) {
-                    showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
-                }
+                
+                // NOTA: A validação de consumo foi temporariamente removida para este teste.
+                // const consumption = calculateAverageConsumption();
+                // if (consumption <= 0) {
+                //     showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
+                // }
                 
                 const resultDiv = document.getElementById('trip-result');
                 resultDiv.classList.remove('hidden');
                 resultDiv.innerHTML = `<p class="text-center p-4">Geocodificando endereços...</p>`;
 
-                // --- ETAPA 1: Converter endereços para coordenadas usando Mapbox ---
                 const getCoords = async (address) => {
                     const formattedAddress = address.replace(/--/g, ', ');
                     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedAddress)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1&country=BR`;
-                    
                     const response = await fetch(url);
                     const data = await response.json();
-                    
                     if (!data.features || data.features.length === 0) {
                         throw new Error(`Endereço não encontrado: ${address}`);
                     }
-                    // Mapbox retorna [longitude, latitude]
-                    return data.features[0].center; 
+                    return data.features[0].center;
                 };
 
                 try {
@@ -897,7 +895,6 @@
                     
                     resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
-                    // --- ETAPA 2: Enviar coordenadas para a TollGuru ---
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
                     const response = await fetch(apiUrl, {
                         method: 'POST',
@@ -906,18 +903,13 @@
                             'x-api-key': TOLLGURU_API_KEY
                         },
                         body: JSON.stringify({
-                            // Conforme a documentação, enviamos lat/lng
                             from: { lat: originCoords[1], lng: originCoords[0] },
                             to: { lat: destCoords[1], lng: destCoords[0] },
                             vehicle: {
                                 type: vehicleType,
                                 fuelPrice: fuelPrice,
-                                fuelPriceCurrency: "BRL",
-                                fuelEfficiency: {
-                                    city: consumption,
-                                    hwy: consumption,
-                                    units: "km/L"
-                                }
+                                fuelPriceCurrency: "BRL"
+                                // O campo 'fuelEfficiency' FOI REMOVIDO PARA ESTE TESTE
                             }
                         })
                     });
@@ -937,6 +929,7 @@
                     const distanceInKm = route.distance.value;
                     const durationText = formatDuration(route.duration.value);
                     const tollCost = route.costs.toll || 0;
+                    // O custo de combustível não será calculado corretamente neste teste
                     const fuelCost = route.costs.fuel || 0;
                     const totalCost = tollCost + fuelCost;
 
@@ -960,48 +953,6 @@
                     showToast(error.message, 'error');
                 }
             };
-            DOM.carModuleBtn.addEventListener('click', showCarModal);
-
-            DOM.carModalContainer.addEventListener('click', async e => {
-                if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
-
-                if (e.target.closest('.tab-btn')) {
-                    const tabBtn = e.target.closest('.tab-btn');
-                    document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-                    tabBtn.classList.add('active');
-                    renderCarTab(tabBtn.dataset.tab);
-                }
-
-                if (e.target.id === 'add-trip-as-expense') {
-                    const value = parseFloat(e.target.dataset.value);
-                    const description = e.target.dataset.desc;
-                    hideCarModal();
-                    showExpenseModal({ category: 'Carro', description: description, value: value });
-                }
-
-                if (e.target.closest('.maint-done-btn')) {
-                    const id = e.target.closest('.maint-done-btn').dataset.id;
-                    const latestOdometer = getLatestOdometer();
-                    const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, latestOdometer);
-                    if (newOdometer && !isNaN(newOdometer)) {
-                        const idx = vehicleData.maintenanceHistory.findIndex(m => String(m.id) === String(id));
-                        vehicleData.maintenanceHistory[idx].lastServiceKm = parseInt(newOdometer);
-                        await saveAppState();
-                        renderCarTab('maintenance');
-                        showToast('Manutenção registrada com sucesso!');
-                    }
-                }
-                if (e.target.closest('.maint-delete-btn')) {
-                    const id = e.target.closest('.maint-delete-btn').dataset.id;
-                    if (confirm('Tem certeza que deseja excluir este agendamento?')) {
-                        vehicleData.maintenanceHistory = vehicleData.maintenanceHistory.filter(m => String(m.id) !== String(id));
-                        await saveAppState();
-                        renderCarTab('maintenance');
-                        showToast('Agendamento excluído.');
-                    }
-                }
-            });
-
             DOM.carModalContainer.addEventListener('submit', async e => {
                 e.preventDefault();
                 switch(e.target.id) {
@@ -1085,6 +1036,7 @@
     </script>
 </body>
 </html>
+
 
 
 
