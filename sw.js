@@ -1,6 +1,10 @@
 const CACHE_NAME = 'painel-financeiro-v1';
 // Lista de arquivos que compõem a "casca" do aplicativo
 const URLS_TO_CACHE = [
+  'index.html',
+  'manifest.json',
+  'icon-192.png',
+  'icon-512.png',
   '/',
   'controle_car.html',
   'https://cdn.tailwindcss.com',
