@@ -490,109 +490,6 @@
                 }
             });
 
-            // ... (código existente do exportJsonBtn) ...
-
-            // ADICIONAR ESTE BLOCO PARA EXPORTAR PDF
-            DOM.exportPdfBtn.addEventListener('click', () => {
-                showToast('Gerando PDF, por favor aguarde...');
-                const reportContent = document.getElementById('report-content'); // O elemento que queremos imprimir
-                const originalStyles = reportContent.style.transform;
-                reportContent.style.transform = 'scale(1)'; // Garante a escala correta
-
-                html2canvas(reportContent, {
-                    scale: 2, // Aumenta a resolução da imagem
-                    useCORS: true,
-                    backgroundColor: '#1f2937' // Cor de fundo do card
-                }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png');
-                    const { jsPDF } = window.jspdf;
-                    
-                    // A4 page size: 210mm x 297mm. 
-                    // A proporção da imagem precisa caber nisso.
-                    const pdf = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'mm',
-                        format: 'a4'
-                    });
-
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = pdf.internal.pageSize.getHeight();
-                    const canvasWidth = canvas.width;
-                    const canvasHeight = canvas.height;
-                    const ratio = canvasWidth / canvasHeight;
-                    
-                    let imgWidth = pdfWidth - 20; // com margens
-                    let imgHeight = imgWidth / ratio;
-
-                    // Se a altura for maior que a página, recalcula com base na altura
-                    if (imgHeight > pdfHeight - 20) {
-                        imgHeight = pdfHeight - 20;
-                        imgWidth = imgHeight * ratio;
-                    }
-                    
-                    const x = (pdfWidth - imgWidth) / 2;
-                    const y = 10; // Margem superior
-
-                    pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-                    pdf.save(`relatorio_financeiro_${getMonthYearKey(currentDate)}.pdf`);
-                    reportContent.style.transform = originalStyles; // Restaura o estilo
-                    showToast('PDF exportado com sucesso!');
-                }).catch(err => {
-                    console.error('Erro ao gerar PDF:', err);
-                    showToast('Falha ao gerar o PDF.', 'error');
-                    reportContent.style.transform = originalStyles;
-                });
-            });
-
-            // ADICIONAR ESTE BLOCO PARA EXPORTAR EXCEL
-            DOM.exportExcelBtn.addEventListener('click', () => {
-                try {
-                    const monthKey = getMonthYearKey(currentDate);
-                    const monthExpenses = expensesData.filter(e => getMonthYearKey(new Date(e.date)) === monthKey);
-
-                    if (monthExpenses.length === 0) {
-                        showToast('Não há dados para exportar neste mês.', 'warning');
-                        return;
-                    }
-
-                    // Prepara os dados para a planilha
-                    const dataToExport = monthExpenses.map(exp => ({
-                        'Data': new Date(exp.date).toLocaleDateString('pt-BR'),
-                        'Descrição': exp.description,
-                        'Categoria': exp.category,
-                        'Valor': exp.value
-                    }));
-
-                    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-                    const workbook = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Despesas');
-
-                    // Formata as colunas
-                    worksheet['!cols'] = [
-                        { wch: 12 }, // Data
-                        { wch: 40 }, // Descrição
-                        { wch: 20 }, // Categoria
-                        { wch: 15 }  // Valor
-                    ];
-                    // Formata a coluna de valor como moeda
-                    dataToExport.forEach((_data, index) => {
-                        const cellRef = XLSX.utils.encode_cell({c: 3, r: index + 1});
-                        worksheet[cellRef].t = 'n';
-                        worksheet[cellRef].z = 'R$ #,##0.00';
-                    });
-
-
-                    XLSX.writeFile(workbook, `despesas_${monthKey}.xlsx`);
-                    showToast('Excel exportado com sucesso!');
-
-                } catch (err) {
-                    console.error('Erro ao gerar Excel:', err);
-                    showToast('Falha ao gerar o Excel.', 'error');
-                }
-            });
-
-            // ... (código existente do importInput) ...
-
             DOM.importInput.addEventListener('change', async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
@@ -613,16 +510,10 @@
                 }
             });
 
-            // ... (código existente) ...
-
             // =================================================================================
             // MÓDULO VEICULAR (usando vehicleData dentro do estado Supabase)
             // =================================================================================
             const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
-            // ADICIONE SUA CHAVE TOLLGURU AQUI
-            const TOLLGURU_API_KEY = 'tg_9BBA616C288749CE95AF42C623EF885E'; 
-
-            // ... (resto do código) ...
 
             const getLatestOdometer = () => {
                 const allEntries = [
@@ -778,18 +669,11 @@
                         const sortedTrips = [...vehicleData.tripHistory].sort((a,b) => new Date(b.date) - new Date(a.date));
                         html = `
                             <form id="trip-calculator-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Calculadora de Rota e Custo (TollGuru)</h3>
+                                <h3 class="font-display text-lg">Calculadora de Rota e Custo (API Mapbox)</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div><label class="block text-sm text-text-secondary">Origem</label><input type="text" id="trip-origin" class="form-input w-full"></div>
                                     <div><label class="block text-sm text-text-secondary">Destino</label><input type="text" id="trip-destination" class="form-input w-full"></div>
-                                    <div>
-                                        <label class="block text-sm text-text-secondary">Tipo do Veículo</label>
-                                        <select id="trip-vehicle-type" class="form-select w-full">
-                                            <option value="2AxlesAuto">Carro de Passeio</option>
-                                            <option value="2AxlesMotorcycle">Moto</option>
-                                        </select>
-                                    </div>
-                                    <div><label class="block text-sm text-text-secondary">Preço Combustível (R$/L)</label><input type="number" step="0.01" id="trip-fuel-price" class="form-input w-full"></div>
+                                    <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Preço do Combustível (R$/L)</label><input type="number" step="0.01" id="trip-fuel-price" class="form-input w-full"></div>
                                 </div>
                                 <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Calcular Rota</button></div>
                             </form>
@@ -857,112 +741,53 @@
                 return str.trim() || '0min';
             };
 
-            
-const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-    // Valida chave (ideal usar via backend/proxy em produção)
-    if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY === 'SUA_CHAVE_API_DA_TOLLGURU_AQUI') {
-        showToast('Chave da API TollGuru não configurada.', 'error'); return;
-    }
-    const consumption = calculateAverageConsumption();
-    if (!consumption || consumption <= 0) {
-        showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
-    }
-
-    const resultDiv = document.getElementById('trip-result');
-    resultDiv.classList.remove('hidden');
-    resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
-
-    // Normaliza os endereços (ajuda o geocoding do provedor)
-    const formattedOrigin = (origin || '').replace(/--/g, ', ').trim();
-    const formattedDestination = (destination || '').replace(/--/g, ', ').trim();
-
-    try {
-        // ===== TollGuru v2 endpoint =====
-        const apiUrl = 'https://apis.tollguru.com/toll/v2/origin-destination-waypoints';
-        const payload = {
-            from: { address: formattedOrigin },
-            to:   { address: formattedDestination },
-            serviceProvider: 'gmaps', // use 'here' se preferir
-            vehicle: { type: vehicleType || '2AxlesAuto' },
-            fuelOptions: {
-                fuelCost: { value: fuelPrice, currency: 'BRL' },
-                fuelEfficiency: { city: consumption, hwy: consumption, units: 'km/L' }
-            },
-            units: { currency: 'BRL', distance: 'km', fuelEfficiency: 'km/L' }
-        };
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': TOLLGURU_API_KEY
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            let errMsg = `Erro HTTP: ${response.status}`;
-            try {
-                const err = await response.json();
-                if (err && (err.message || err.error)) errMsg = err.message || err.error;
-            } catch (_) {}
-            throw new Error(errMsg);
-        }
-
-        const data = await response.json();
-        if (!data || data.status !== 'OK' || !Array.isArray(data.routes) || data.routes.length === 0) {
-            throw new Error('Resposta inesperada da TollGuru.');
-        }
-
-        // Helper para parsear números e objetos possivelmente serializados
-        const parseNum = (v) => (typeof v === 'number') ? v : parseFloat(v || 0) || 0;
-        const maybeObj = (v) => {
-            if (v && typeof v === 'string') { try { return JSON.parse(v); } catch (_) { return null; } }
-            if (v && typeof v === 'object') return v;
-            return null;
-        };
-
-        // Seleciona a rota mais barata (pedágio + combustível)
-        let best = null;
-        for (const r of data.routes) {
-            const costs = r.costs || {};
-            const toll = parseNum(costs.tag ?? costs.cash ?? costs.licensePlate ?? costs.prepaidCard ?? 0);
-            const fuel = parseNum(costs.fuel ?? 0);
-
-            const summary = r.summary || {};
-            const dObj = maybeObj(summary.distance) || summary.distance;
-            const tObj = maybeObj(summary.duration) || summary.duration;
-            const distanceKm = dObj && typeof dObj === 'object' && 'value' in dObj ? parseNum(dObj.value) / 1000 : parseNum(dObj || 0);
-            const durationSec = tObj && typeof tObj === 'object' && 'value' in tObj ? parseNum(tObj.value) : parseNum(tObj || 0);
-
-            const total = toll + fuel;
-            const current = { toll, fuel, total, distanceKm, durationSec };
-            if (!best || current.total < best.total) best = current;
-        }
-
-        if (!best) throw new Error('Nenhuma rota válida retornada.');
-
-        const durationText = formatDuration(best.durationSec);
-        resultDiv.innerHTML = `
-            <div class="p-4 rounded-lg bg-background-color border border-border-color">
-                <h5 class="font-bold text-lg mb-3">Resultado da Rota (via TollGuru)</h5>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                    <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${best.distanceKm.toFixed(1)} km</p></div>
-                    <div><p class="text-sm text-text-secondary">Duração</p><p class="font-bold text-xl">${durationText}</p></div>
-                    <div><p class="text-sm text-text-secondary">Pedágios</p><p class="font-bold text-xl text-yellow-400">${formatCurrency(best.toll)}</p></div>
-                    <div><p class="text-sm text-text-secondary">Custo Total</p><p class="font-bold text-xl text-brand">${formatCurrency(best.total)}</p></div>
-                </div>
-                <div class="text-center mt-4">
-                    <button id="add-trip-as-expense" data-value="${best.total.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
-                </div>
-            </div>`;
-
-    } catch (error) {
-        console.error("Erro na API TollGuru:", error);
-        resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
-        showToast('Erro ao calcular a rota com pedágios.', 'error');
-    }
-};
+            const calculateTripDetails = async (origin, destination, fuelPrice) => {
+                if (MAPBOX_ACCESS_TOKEN === 'COLE_SEU_ACCESS_TOKEN_DO_MAPBOX_AQUI' || !MAPBOX_ACCESS_TOKEN) {
+                    showToast('Access Token do Mapbox não configurado.', 'error'); return;
+                }
+                const consumption = calculateAverageConsumption();
+                if (consumption <= 0) {
+                    showToast('Calcule o consumo médio primeiro registrando ao menos 2 abastecimentos.', 'error'); return;
+                }
+                const resultDiv = document.getElementById('trip-result');
+                resultDiv.classList.remove('hidden');
+                resultDiv.innerHTML = `<p class="text-center p-4">Calculando...</p>`;
+                try {
+                    const geocodeUrl = (place) => `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(place)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1`;
+                    const originResponse = await fetch(geocodeUrl(origin));
+                    const originData = await originResponse.json();
+                    if (!originData.features || originData.features.length === 0) throw new Error(`Endereço de origem não encontrado: ${origin}`);
+                    const originCoords = originData.features[0].center;
+                    const destResponse = await fetch(geocodeUrl(destination));
+                    const destData = await destResponse.json();
+                    if (!destData.features || destData.features.length === 0) throw new Error(`Endereço de destino não encontrado: ${destination}`);
+                    const destCoords = destData.features[0].center;
+                    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${originCoords[0]},${originCoords[1]};${destCoords[0]},${destCoords[1]}?access_token=${MAPBOX_ACCESS_TOKEN}`;
+                    const directionsResponse = await fetch(directionsUrl);
+                    const directionsData = await directionsResponse.json();
+                    if (directionsData.code !== 'Ok') throw new Error(directionsData.message || 'Não foi possível calcular a rota.');
+                    const route = directionsData.routes[0];
+                    const distanceInKm = route.distance / 1000;
+                    const durationText = formatDuration(route.duration);
+                    const cost = (distanceInKm / consumption) * fuelPrice;
+                    resultDiv.innerHTML = `
+                        <div class="p-4 rounded-lg bg-background-color border border-border-color">
+                            <h5 class="font-bold text-lg mb-2">Resultado da Rota (via Mapbox)</h5>
+                            <div class="grid grid-cols-3 gap-2 text-center">
+                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
+                                <div><p class="text-sm text-text-secondary">Duração Est.</p><p class="font-bold text-xl">${durationText}</p></div>
+                                <div><p class="text-sm text-text-secondary">Custo Est.</p><p class="font-bold text-xl text-brand">${formatCurrency(cost)}</p></div>
+                            </div>
+                            <div class="text-center mt-4">
+                                <button id="add-trip-as-expense" data-value="${cost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
+                            </div>
+                        </div>`;
+                } catch(error) {
+                    console.error("Erro na API do Mapbox:", error);
+                    resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
+                    showToast('Erro ao calcular a rota.', 'error');
+                }
+            };
 
             DOM.carModuleBtn.addEventListener('click', showCarModal);
 
@@ -1065,10 +890,8 @@ const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleTyp
                         const origin = document.getElementById('trip-origin').value;
                         const destination = document.getElementById('trip-destination').value;
                         const fuelPrice = parseFloat(document.getElementById('trip-fuel-price').value);
-                        const vehicleType = document.getElementById('trip-vehicle-type').value; // Pega o novo valor
                         if (!origin || !destination || !fuelPrice) { showToast('Preencha todos os campos da rota.', 'error'); return; }
-                        // Chama a nova função com o parâmetro extra
-                        await calculateTripWithTolls(origin, destination, fuelPrice, vehicleType);
+                        await calculateTripDetails(origin, destination, fuelPrice);
                         break;
                     }
                 }
@@ -1089,7 +912,4 @@ const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleTyp
     </script>
 </body>
 </html>
-
-
-
 
