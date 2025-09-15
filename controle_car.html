@@ -85,6 +85,13 @@
     </style>
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#111827">
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.error);
+    });
+  }
+</script>
 </head>
 <body class="dark p-4 sm:p-6 lg:p-8 flex flex-col">
 
@@ -1049,4 +1056,5 @@
 
 </body>
 </html>
+
 
