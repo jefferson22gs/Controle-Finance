@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style> body { background-color: #111827; } </style>
 </head>
-<link rel="manifest" href="./manifest.webmanifest">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#111827">
 <script>
 if ('serviceWorker' in navigator) {
@@ -37,8 +37,20 @@ if ('serviceWorker' in navigator) {
             </div>
         </form>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
 <script src="supabaseClient.js"></script>
+<script>
+(async () => {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+      const next = new URLSearchParams(location.search).get('next') || 'controle_car.html';
+      location.href = next;
+    }
+  } catch (e) { /* no-op */ }
+})();
+</script>
+
 <script>
   const loginForm = document.getElementById("login-form");
   const messageDiv = document.getElementById("message-div");
