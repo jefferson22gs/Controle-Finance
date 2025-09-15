@@ -778,7 +778,7 @@
                         const sortedTrips = [...vehicleData.tripHistory].sort((a,b) => new Date(b.date) - new Date(a.date));
                         html = `
                             <form id="trip-calculator-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Calculadora de Rota e Custo (API Mapbox)</h3>
+                                <h3 class="font-display text-lg">Calculadora de Rota e Custo (TollGuru)</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div><label class="block text-sm text-text-secondary">Origem</label><input type="text" id="trip-origin" class="form-input w-full"></div>
                                     <div><label class="block text-sm text-text-secondary">Destino</label><input type="text" id="trip-destination" class="form-input w-full"></div>
@@ -857,107 +857,155 @@
                 return str.trim() || '0min';
             };
 
-            const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-                // Validações iniciais (Chaves, Consumo, etc.)
-                if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY.includes('SUA_CHAVE')) {
-                    showToast('Chave da API TollGuru não configurada.', 'error'); return;
-                }
-                if (!MAPBOX_ACCESS_TOKEN || MAPBOX_ACCESS_TOKEN.includes('SEU_ACCESS_TOKEN')) {
-                    showToast('Access Token do Mapbox não configurado.', 'error'); return;
-                }
-                const consumption = calculateAverageConsumption();
-                if (consumption <= 0) {
-                    showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
-                }
-                
-                const resultDiv = document.getElementById('trip-result');
-                resultDiv.classList.remove('hidden');
-                resultDiv.innerHTML = `<p class="text-center p-4">Geocodificando endereços...</p>`;
+            
+const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
+    // Valida chave (ideal usar via backend/proxy em produção)
+    if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY === 'SUA_CHAVE_API_DA_TOLLGURU_AQUI') {
+        showToast('Chave da API TollGuru não configurada.', 'error'); return;
+    }
+    const consumption = calculateAverageConsumption();
+    if (!consumption || consumption <= 0) {
+        showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
+    }
 
-                // Etapa 1: Converter endereços para coordenadas usando Mapbox
-                const getCoords = async (address) => {
-                    const formattedAddress = address.replace(/--/g, ', ');
-                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedAddress)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1&country=BR`;
-                    
-                    const response = await fetch(url);
-                    const data = await response.json();
-                    
-                    if (!data.features || data.features.length === 0) {
-                        throw new Error(`Endereço não encontrado: ${address}`);
+    const resultDiv = document.getElementById('trip-result');
+    resultDiv.classList.remove('hidden');
+    resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
+
+    // Normaliza os endereços (ajuda o geocoding do provedor)
+    const formattedOrigin = (origin || '').replace(/--/g, ', ').trim();
+    const formattedDestination = (destination || '').replace(/--/g, ', ').trim();
+
+    try {
+        // ===== TollGuru v2 endpoint =====
+        const apiUrl = 'https://apis.tollguru.com/toll/v2/origin-destination-waypoints';
+        const payload = {
+            from: { address: formattedOrigin },
+            to:   { address: formattedDestination },
+            serviceProvider: 'gmaps', // use 'here' se preferir
+            vehicle: { type: vehicleType || '2AxlesAuto' },
+            fuelOptions: {
+                fuelCost: { value: fuelPrice, currency: 'BRL' },
+                fuelEfficiency: { city: consumption, hwy: consumption, units: 'km/L' }
+            },
+            units: { currency: 'BRL', distance: 'km', fuelEfficiency: 'km/L' }
+        };
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': TOLLGURU_API_KEY
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            let errMsg = `Erro HTTP: ${response.status}`;
+            try {
+                const err = await response.json();
+                if (err && (err.message || err.error)) errMsg = err.message || err.error;
+            } catch (_) {}
+            throw new Error(errMsg);
+        }
+
+        const data = await response.json();
+        if (!data || data.status !== 'OK' || !Array.isArray(data.routes) || data.routes.length === 0) {
+            throw new Error('Resposta inesperada da TollGuru.');
+        }
+
+        // Helper para parsear números e objetos possivelmente serializados
+        const parseNum = (v) => (typeof v === 'number') ? v : parseFloat(v || 0) || 0;
+        const maybeObj = (v) => {
+            if (v && typeof v === 'string') { try { return JSON.parse(v); } catch (_) { return null; } }
+            if (v && typeof v === 'object') return v;
+            return null;
+        };
+
+        // Seleciona a rota mais barata (pedágio + combustível)
+        let best = null;
+        for (const r of data.routes) {
+            const costs = r.costs || {};
+            const toll = parseNum(costs.tag ?? costs.cash ?? costs.licensePlate ?? costs.prepaidCard ?? 0);
+            const fuel = parseNum(costs.fuel ?? 0);
+
+            const summary = r.summary || {};
+            const dObj = maybeObj(summary.distance) || summary.distance;
+            const tObj = maybeObj(summary.duration) || summary.duration;
+            const distanceKm = dObj && typeof dObj === 'object' && 'value' in dObj ? parseNum(dObj.value) / 1000 : parseNum(dObj || 0);
+            const durationSec = tObj && typeof tObj === 'object' && 'value' in tObj ? parseNum(tObj.value) : parseNum(tObj || 0);
+
+            const total = toll + fuel;
+            const current = { toll, fuel, total, distanceKm, durationSec };
+            if (!best || current.total < best.total) best = current;
+        }
+
+        if (!best) throw new Error('Nenhuma rota válida retornada.');
+
+        const durationText = formatDuration(best.durationSec);
+        resultDiv.innerHTML = `
+            <div class="p-4 rounded-lg bg-background-color border border-border-color">
+                <h5 class="font-bold text-lg mb-3">Resultado da Rota (via TollGuru)</h5>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${best.distanceKm.toFixed(1)} km</p></div>
+                    <div><p class="text-sm text-text-secondary">Duração</p><p class="font-bold text-xl">${durationText}</p></div>
+                    <div><p class="text-sm text-text-secondary">Pedágios</p><p class="font-bold text-xl text-yellow-400">${formatCurrency(best.toll)}</p></div>
+                    <div><p class="text-sm text-text-secondary">Custo Total</p><p class="font-bold text-xl text-brand">${formatCurrency(best.total)}</p></div>
+                </div>
+                <div class="text-center mt-4">
+                    <button id="add-trip-as-expense" data-value="${best.total.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
+                </div>
+            </div>`;
+
+    } catch (error) {
+        console.error("Erro na API TollGuru:", error);
+        resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
+        showToast('Erro ao calcular a rota com pedágios.', 'error');
+    }
+};
+
+            DOM.carModuleBtn.addEventListener('click', showCarModal);
+
+            DOM.carModalContainer.addEventListener('click', async e => {
+                if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
+
+                if (e.target.closest('.tab-btn')) {
+                    const tabBtn = e.target.closest('.tab-btn');
+                    document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+                    tabBtn.classList.add('active');
+                    renderCarTab(tabBtn.dataset.tab);
+                }
+
+                if (e.target.id === 'add-trip-as-expense') {
+                    const value = parseFloat(e.target.dataset.value);
+                    const description = e.target.dataset.desc;
+                    hideCarModal();
+                    showExpenseModal({ category: 'Carro', description: description, value: value });
+                }
+
+                if (e.target.closest('.maint-done-btn')) {
+                    const id = e.target.closest('.maint-done-btn').dataset.id;
+                    const latestOdometer = getLatestOdometer();
+                    const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, latestOdometer);
+                    if (newOdometer && !isNaN(newOdometer)) {
+                        const idx = vehicleData.maintenanceHistory.findIndex(m => String(m.id) === String(id));
+                        vehicleData.maintenanceHistory[idx].lastServiceKm = parseInt(newOdometer);
+                        await saveAppState();
+                        renderCarTab('maintenance');
+                        showToast('Manutenção registrada com sucesso!');
                     }
-                    return data.features[0].center; 
-                };
-
-                try {
-                    const [originCoords, destCoords] = await Promise.all([
-                        getCoords(origin),
-                        getCoords(destination)
-                    ]);
-                    
-                    resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
-
-                    // Etapa 2: Enviar coordenadas para a TollGuru
-                    const apiUrl = 'https://api.tollguru.com/v1/calc/route';
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-api-key': TOLLGURU_API_KEY
-                        },
-                        body: JSON.stringify({
-                            from: { lat: originCoords[1], lng: originCoords[0] },
-                            to: { lat: destCoords[1], lng: destCoords[0] },
-                            vehicle: {
-                                type: vehicleType,
-                                fuelPrice: fuelPrice,
-                                fuelPriceCurrency: "BRL",
-                                fuelEfficiency: {
-                                    city: consumption,
-                                    hwy: consumption,
-                                    units: "km/L"
-                                }
-                            }
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        throw new Error(errorData.message || `Erro HTTP: ${response.status}`);
-                    }
-
-                    const data = await response.json();
-
-                    if (data.status !== 'OK' || !data.route) {
-                        throw new Error(data.message || 'Não foi possível calcular a rota com pedágios.');
-                    }
-                    
-                    const route = data.route;
-                    const distanceInKm = route.distance.value;
-                    const durationText = formatDuration(route.duration.value);
-                    const tollCost = route.costs.toll || 0;
-                    const fuelCost = route.costs.fuel || 0;
-                    const totalCost = tollCost + fuelCost;
-
-                    resultDiv.innerHTML = `
-                        <div class="p-4 rounded-lg bg-background-color border border-border-color">
-                            <h5 class="font-bold text-lg mb-3">Resultado da Rota (Custo Total Estimado)</h5>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
-                                <div><p class="text-sm text-text-secondary">Duração</p><p class="font-bold text-xl">${durationText}</p></div>
-                                <div><p class="text-sm text-text-secondary">Pedágios</p><p class="font-bold text-xl text-yellow-400">${formatCurrency(tollCost)}</p></div>
-                                <div><p class="text-sm text-text-secondary">Custo Total</p><p class="font-bold text-xl text-brand">${formatCurrency(totalCost)}</p></div>
-                            </div>
-                            <div class="text-center mt-4">
-                                <button id="add-trip-as-expense" data-value="${totalCost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
-                            </div>
-                        </div>`;
-
-                } catch (error) {
-                    console.error("Erro no processo de cálculo da rota:", error);
-                    resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
-                    showToast(error.message, 'error');
                 }
-            };
+                if (e.target.closest('.maint-delete-btn')) {
+                    const id = e.target.closest('.maint-delete-btn').dataset.id;
+                    if (confirm('Tem certeza que deseja excluir este agendamento?')) {
+                        vehicleData.maintenanceHistory = vehicleData.maintenanceHistory.filter(m => String(m.id) !== String(id));
+                        await saveAppState();
+                        renderCarTab('maintenance');
+                        showToast('Agendamento excluído.');
+                    }
+                }
+            });
+
             DOM.carModalContainer.addEventListener('submit', async e => {
                 e.preventDefault();
                 switch(e.target.id) {
@@ -1041,10 +1089,6 @@
     </script>
 </body>
 </html>
-
-
-
-
 
 
 
