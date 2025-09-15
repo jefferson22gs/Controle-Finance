@@ -1045,13 +1045,24 @@
                         renderCarTab('maintenance');
                         break;
                     }
-                    case 'trip-calculator-form': {
+                   case 'trip-calculator-form': {
                         const origin = document.getElementById('trip-origin').value;
                         const destination = document.getElementById('trip-destination').value;
                         const fuelPrice = parseFloat(document.getElementById('trip-fuel-price').value);
-                        const vehicleType = document.getElementById('trip-vehicle-type').value; // Pega o novo valor
-                        if (!origin || !destination || !fuelPrice) { showToast('Preencha todos os campos da rota.', 'error'); return; }
-                        // Chama a nova função com o parâmetro extra
+                        const vehicleType = document.getElementById('trip-vehicle-type').value;
+
+                        // =================================================================
+                        // VALIDAÇÃO CORRIGIDA: Verifica se origem e destino não estão vazios
+                        if (!origin.trim() || !destination.trim()) {
+                            showToast('Por favor, preencha os campos de Origem e Destino.', 'error');
+                            return; // Impede a chamada da API se os campos estiverem vazios
+                        }
+                        if (!fuelPrice) {
+                            showToast('Por favor, preencha o preço do combustível.', 'error');
+                            return;
+                        }
+                        // =================================================================
+
                         await calculateTripWithTolls(origin, destination, fuelPrice, vehicleType);
                         break;
                     }
@@ -1073,6 +1084,7 @@
     </script>
 </body>
 </html>
+
 
 
 
