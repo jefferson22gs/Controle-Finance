@@ -151,108 +151,136 @@
     <div id="toast-notification"></div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-          (async () => {
-            // =================================================================================
-            // CONFIGURAÇÃO SUPABASE
-            // =================================================================================
-            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0';
-            const HOUSEHOLD_ID = 'default';
+        //
+// COPIE E COLE ESTE BLOCO INTEIRO DENTRO DA TAG <script> EM controle_car.html
+//
+document.addEventListener('DOMContentLoaded', () => {
+    (async () => {
+        // =================================================================================
+        // CONFIGURAÇÃO SUPABASE
+        // =================================================================================
+        const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-            if (SUPABASE_URL.includes('YOUR-PROJECT')) {
-            alert('Configure a SUPABASE_URL no topo do arquivo.');
-            return;
+        // =================================================================================
+        // VERIFICAÇÃO DE SESSÃO DO USUÁRIO (NOVA PARTE CORRIGIDA)
+        // =================================================================================
+        let userId = null;
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+            window.location.href = 'index.html';
+            return; // Interrompe a execução do script se não houver usuário
+        } else {
+            userId = session.user.id;
+        }
+
+        // =================================================================================
+        // CONSTANTES / ESTADO (o resto do seu código)
+        // =================================================================================
+        const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
+        const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
+        const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': 'red', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
+
+        let expensesData = [];
+        let incomeData = {};
+        let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
+
+        let currentDate = new Date();
+        let currentEditingId = null;
+        window.myExpensesChart = null;
+
+        const DOM = {
+            body: document.body, mainContainer: document.getElementById('main-container'),
+            prevMonthBtn: document.getElementById('prev-month-btn'), nextMonthBtn: document.getElementById('next-month-btn'),
+            monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
+            categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
+            addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
+            salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
+            exportJsonBtn: document.getElementById('export-json-btn'), exportPdfBtn: document.getElementById('export-pdf-btn'),
+            exportExcelBtn: document.getElementById('export-excel-btn'), importInput: document.getElementById('import-file-input'),
+            toast: document.getElementById('toast-notification'),
+            carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
+        };
+
+        // =================================================================================
+        // HELPERS
+        // =================================================================================
+        const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const toISODateString = (date) => date.toISOString().split('T')[0];
+        const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const showToast = (message, type = 'success') => {
+            DOM.toast.textContent = message;
+            DOM.toast.className = '';
+            DOM.toast.classList.toggle('error', type !== 'success');
+            DOM.toast.classList.add('show');
+            setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000);
+        };
+
+        // =================================================================================
+        // SUPABASE - APP STATE (jsonb) - MODIFICADO
+        // =================================================================================
+        async function getAppState() {
+            if (!userId) return null;
+            const { data, error } = await supabase
+                .from('app_state')
+                .select('data')
+                .eq('id', userId) // Usa o ID do usuário logado
+                .maybeSingle();
+            if (error) {
+                console.error('Erro ao buscar app_state:', error);
+                showToast('Erro ao carregar dados do Supabase.', 'error');
+                return null;
             }
-
-            // Linha Corrigida: Usando SUPABASE_KEY
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-            // =================================================================================
-            // CONSTANTES / ESTADO (iguais ao original)
-            // =================================================================================
-            const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
-            const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
-            const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': '#ef4444', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
-
-            let expensesData = [];
-            let incomeData = {};
-            let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
-
-            let currentDate = new Date();
-            let currentEditingId = null;
-            window.myExpensesChart = null;
-
-            const DOM = {
-                body: document.body, mainContainer: document.getElementById('main-container'),
-                prevMonthBtn: document.getElementById('prev-month-btn'), nextMonthBtn: document.getElementById('next-month-btn'),
-                monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
-                categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
-                addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
-                salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
-                exportJsonBtn: document.getElementById('export-json-btn'), exportPdfBtn: document.getElementById('export-pdf-btn'),
-                exportExcelBtn: document.getElementById('export-excel-btn'), importInput: document.getElementById('import-file-input'),
-                toast: document.getElementById('toast-notification'),
-                carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
-            };
-
-            // =================================================================================
-            // HELPERS
-            // =================================================================================
-            const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            const toISODateString = (date) => date.toISOString().split('T')[0];
-            const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const showToast = (message, type = 'success') => {
-                DOM.toast.textContent = message;
-                DOM.toast.className = '';
-                DOM.toast.classList.toggle('error', type !== 'success');
-                DOM.toast.classList.add('show');
-                setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000);
-            };
-
-            // =================================================================================
-            // SUPABASE - APP STATE (jsonb)
-            // =================================================================================
-            async function getAppState() {
-                const { data, error } = await supabase
+            if (!data) {
+                const initial = {
+                    expensesData: [],
+                    incomeData: {},
+                    vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }
+                };
+                const { error: insertErr } = await supabase
                     .from('app_state')
-                    .select('data')
-                    .eq('id', HOUSEHOLD_ID)
-                    .maybeSingle();
-                if (error) {
-                    console.error('Erro ao buscar app_state:', error);
-                    showToast('Erro ao carregar dados do Supabase.', 'error');
+                    .insert({ id: userId, data: initial }); // Usa o ID do usuário logado
+                if (insertErr) {
+                    console.error('Erro ao inicializar app_state:', insertErr);
+                    showToast('Erro ao inicializar dados no Supabase.', 'error');
                     return null;
                 }
-                if (!data) {
-                    const initial = {
-                        expensesData: [],
-                        incomeData: {},
-                        vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }
-                    };
-                    const { error: insertErr } = await supabase
-                        .from('app_state')
-                        .insert({ id: HOUSEHOLD_ID, data: initial });
-                    if (insertErr) {
-                        console.error('Erro ao inicializar app_state:', insertErr);
-                        showToast('Erro ao inicializar dados no Supabase.', 'error');
-                        return null;
-                    }
-                    return initial;
-                }
-                return data.data || { expensesData: [], incomeData: {}, vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] } };
+                return initial;
             }
+            return data.data || { expensesData: [], incomeData: {}, vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] } };
+        }
 
-            async function saveAppState() {
-                const state = { expensesData, incomeData, vehicleData };
-                const { error } = await supabase
-                    .from('app_state')
-                    .upsert({ id: HOUSEHOLD_ID, data: state });
-                if (error) {
-                    console.error('Erro ao salvar app_state:', error);
-                    showToast('Erro ao salvar no Supabase.', 'error');
-                }
+        async function saveAppState() {
+            if (!userId) return;
+            const state = { expensesData, incomeData, vehicleData };
+            const { error } = await supabase
+                .from('app_state')
+                .upsert({ id: userId, data: state }); // Usa o ID do usuário logado
+            if (error) {
+                console.error('Erro ao salvar app_state:', error);
+                showToast('Erro ao salvar no Supabase.', 'error');
             }
+        }
+
+        // =================================================================================
+        // O RESTANTE DO SEU CÓDIGO (RENDERIZAÇÃO, MODAIS, EVENTOS, ETC.) CONTINUA AQUI...
+        // ... cole o código acima e garanta que ele substitua todo o script antigo
+        // até o final da função anônima `})();`
+        // =================================================================================
+        
+        // Coloque o restante do seu código JavaScript original aqui,
+        // começando da função `renderMonthView` até o final.
+        // O código que te enviei aqui vai até a função saveAppState.
+        // O resto do seu arquivo (renderMonthView, renderSummary, etc.) não precisa mudar.
+        
+        // Para facilitar, aqui está o código completo que você precisa ter:
+        // O bloco acima (até a função saveAppState) + TODO o restante do seu código
+        // que já estava no arquivo.
+
+    })();
+});
 
             // =================================================================================
             // RENDERIZAÇÃO DE TELA (igual ao original)
@@ -1049,4 +1077,5 @@
 
 </body>
 </html>
+
 
