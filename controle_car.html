@@ -1,915 +1,863 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Financeiro - Casal (Supabase)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Financeiro - Supabase + Pedágios</title>
 
-    <!-- Tailwind & libs -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Tailwind & libs -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Export helpers (mantidos) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Export helpers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Supabase JS v2 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet">
+  <!-- CONFIG: substitua pelas suas chaves OU defina via window.SUPABASE_URL/KEY e window.GOOGLE_MAPS_API_KEY -->
+  <meta name="supabase-url" content="https://zsoxlkuyrysytusncuxf.supabase.co" />
+  <meta name="supabase-key" content="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0" />
+  <meta name="google-maps-key" content="AIzaSyBvQr-dQcJzEQBrxzijlglFYdd5nMonJow" />
 
-    <!--
-        ===========================================
-        SETUP RÁPIDO (LEIA-ME)
-        ===========================================
-        1) Crie a tabela no Supabase (SQL):
-
-           create table if not exists public.app_state (
-             id text primary key,
-             data jsonb not null default '{}'::jsonb
-           );
-
-           -- Políticas RLS (exemplo didático - ajuste para seu caso!)
-           alter table public.app_state enable row level security;
-           drop policy if exists "app_state_all" on public.app_state;
-           create policy "app_state_all" on public.app_state
-           for all
-           using (true)
-           with check (true);
-
-        2) Preencha SUPABASE_URL, SUPABASE_ANON_KEY e HOUSEHOLD_ID abaixo.
-           HOUSEHOLD_ID separa seus dados de outros usuários/projetos.
-
-        3) Abra este arquivo em um host/servidor ou diretamente no navegador.
-    -->
-
-    <style>
-        :root {
-            --primary-color: #6366f1;
-            --primary-color-dark: #4f46e5;
-            --background-color: #111827;
-            --card-background-color: #1f2937;
-            --text-color-primary: #f9fafb;
-            --text-color-secondary: #9ca3af;
-            --border-color: #374151;
-            --warning-color: #f59e0b;
-            --danger-color: #ef4444;
-        }
-        body { font-family: 'Poppins', sans-serif; background-color: var(--background-color); color: var(--text-color-primary); }
-        h1, h2, h3, h4, .font-display { font-family: 'Inter', sans-serif; font-weight: 700; }
-        .main-container { background-color: var(--card-background-color); border-radius: 1.5rem; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); transition: opacity 0.3s, transform 0.3s; position: relative; z-index: 10; }
-        .main-container.modal-open { opacity: 0; transform: scale(0.98); }
-        .bg-brand { background-color: var(--primary-color); }
-        .text-brand { color: var(--primary-color); }
-        .hover\:bg-brand-dark:hover { background-color: var(--primary-color-dark); }
-        .summary-card, .expense-card, .control-bar { background-color: var(--card-background-color); border: 1px solid var(--border-color); }
-        .expense-card:hover { transform: translateY(-3px) scale(1.01); cursor: pointer; }
-        .form-input, .form-select { background-color: var(--background-color); border: 1px solid var(--border-color); color: var(--text-color-primary); }
-        .form-input:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3); border-color: var(--primary-color); outline: none; }
-        .modal-container { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow-y: auto; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
-        .modal-container.visible { opacity: 1; pointer-events: auto; }
-        #toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 500; background-color: #22c55e; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: bottom 0.5s ease-in-out; z-index: 100; }
-        #toast-notification.show { bottom: 20px; }
-        #toast-notification.error { background-color: var(--danger-color); }
-        .tab-btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; color: var(--text-color-secondary); transition: all 0.2s; border-bottom: 2px solid transparent; flex-shrink: 0; }
-        .tab-btn.active { color: var(--text-color-primary); background-color: rgba(255, 255, 255, 0.05); border-bottom-color: var(--primary-color); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        .progress-bar { background-color: var(--border-color); border-radius: 9999px; overflow: hidden; }
-        .progress-bar-inner { height: 100%; border-radius: 9999px; transition: width 0.5s ease-in-out; }
-        .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
-    </style>
+  <style>
+    :root {
+      --primary-color: #6366f1;
+      --background-color: #111827;
+      --card-background-color: #1f2937;
+      --text-color-primary: #f9fafb;
+      --text-color-secondary: #9ca3af;
+      --border-color: #374151;
+      --danger-color: #ef4444;
+    }
+    body { font-family: Inter, Poppins, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--background-color); color: var(--text-color-primary); }
+    .main-container { background: var(--card-background-color); border: 1px solid var(--border-color); border-radius: 1.5rem; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+    .bg-brand { background-color: var(--primary-color); }
+    .text-brand { color: var(--primary-color); }
+    .summary-card, .expense-card, .control-bar { background: var(--card-background-color); border: 1px solid var(--border-color); }
+    .form-input, .form-select { background: var(--background-color); border: 1px solid var(--border-color); color: var(--text-color-primary); }
+    .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
+    .modal-container { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow-y: auto; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    .modal-container.visible { opacity: 1; pointer-events: auto; }
+    #toast-notification { position: fixed; bottom: -100px; left: 50%; transform: translateX(-50%); padding: 12px 24px; border-radius: 8px; color: white; font-weight: 600; background: #22c55e; box-shadow: 0 4px 15px rgba(0,0,0,.2); transition: bottom .5s; z-index: 100; }
+    #toast-notification.show { bottom: 20px; }
+    #toast-notification.error { background: var(--danger-color); }
+    .tab-btn { padding: 8px 16px; border-radius: 8px; font-weight: 600; color: var(--text-color-secondary); border-bottom: 2px solid transparent; }
+    .tab-btn.active { color: var(--text-color-primary); background: rgba(255,255,255,.05); border-bottom-color: var(--primary-color); }
+  </style>
 </head>
-<body class="dark p-4 sm:p-6 lg:p-8 flex flex-col">
+<body class="p-4 sm:p-6 lg:p-8 flex flex-col">
+  <div id="main-container" class="main-container w-full max-w-7xl mx-auto flex flex-col flex-grow p-6 sm:p-8">
+    <header class="text-center mb-8">
+      <div class="flex justify-center items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9 text-brand" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" /><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" /></svg>
+        <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Painel Financeiro</h1>
+      </div>
+      <p class="mt-2 text-lg text-gray-300">Persistência em Supabase + Rotas com Pedágios (Google)</p>
+    </header>
 
-    <div id="main-container" class="main-container w-full max-w-7xl mx-auto flex flex-col flex-grow p-6 sm:p-8">
-        <header class="text-center mb-8 flex-shrink-0">
-             <div class="flex justify-center items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9 text-brand" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" /><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" /></svg>
-                <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Painel Financeiro</h1>
-            </div>
-            <p class="text-text-secondary mt-2 text-lg">Agora com persistência em Supabase <span class="badge">beta</span></p>
-        </header>
-        <div class="control-bar flex justify-between items-center mb-6 p-3 rounded-xl flex-shrink-0">
-            <button id="prev-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Mês Anterior"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
-            <h2 id="month-header" class="text-lg sm:text-xl font-bold text-center"></h2>
-            <button id="next-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Próximo Mês"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
-        </div>
-
-        <div id="report-content" class="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow overflow-hidden">
-            <div class="lg:col-span-4 flex flex-col gap-6 overflow-y-auto pr-2">
-                <div class="summary-card p-5">
-                    <div class="flex items-center justify-between">
-                        <h3 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider mb-3">Renda Mensal</h3>
-                        <span class="badge" title="Dados salvos no Supabase">Supabase</span>
-                    </div>
-                    <div class="space-y-3">
-                        <div><label for="salary1" class="text-xs text-text-secondary font-medium">Renda 1 (R$)</label><input type="number" id="salary1" placeholder="3500.00" step="0.01" class="form-input mt-1 w-full rounded-md p-2"></div>
-                        <div><label for="salary2" class="text-xs text-text-secondary font-medium">Renda 2 (R$)</label><input type="number" id="salary2" placeholder="2800.00" step="0.01" class="form-input mt-1 w-full rounded-md p-2"></div>
-                    </div>
-                </div>
-                <div id="summary-section" class="space-y-4"></div>
-                <div class="summary-card p-4">
-                    <h3 class="font-display text-center text-text-secondary mb-3 text-md">Distribuição de Saídas</h3>
-                    <canvas id="expensesChart"></canvas>
-                </div>
-                <div id="category-summary-section" class="space-y-2"></div>
-            </div>
-
-            <div class="lg:col-span-8 flex flex-col">
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-5 flex-shrink-0">
-                    <h3 class="font-display text-2xl">Lançamentos do Mês</h3>
-                    <div class="flex items-center gap-2">
-                        <div class="flex items-center gap-2 bg-card-background-color border border-border-color rounded-lg p-1 shadow-sm">
-                            <button id="export-pdf-btn" class="hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Exportar Relatório em PDF">PDF</button>
-                            <button id="export-excel-btn" class="hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Exportar dados para Excel">Excel</button>
-                            <button id="export-json-btn" class="hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Exportar backup (JSON)">Backup</button>
-                            <label for="import-file-input" class="cursor-pointer hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Importar backup (JSON)">Importar</label>
-                        </div>
-                        <input type="file" id="import-file-input" class="hidden" accept=".json">
-
-                        <button id="car-module-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold p-2 rounded-lg shadow-md transition-colors duration-200" title="Painel do Veículo">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" /><path d="M8 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                        </button>
-
-                        <button id="add-expense-btn" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg shadow-md transition-colors duration-200">Adicionar</button>
-                    </div>
-                </div>
-                <div id="expenses-list" class="space-y-3 flex-grow overflow-y-auto pr-2"></div>
-            </div>
-        </div>
+    <div class="control-bar flex justify-between items-center mb-6 p-3 rounded-xl">
+      <button id="prev-month-btn" class="p-2 rounded-full hover:bg-gray-700" title="Mês Anterior"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
+      <h2 id="month-header" class="text-xl font-bold text-center"></h2>
+      <button id="next-month-btn" class="p-2 rounded-full hover:bg-gray-700" title="Próximo Mês"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
     </div>
 
-    <div id="expense-modal-container" class="modal-container"></div>
-    <div id="car-modal-container" class="modal-container"></div>
-    <div id="toast-notification"></div>
+    <div id="report-content" class="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow overflow-hidden">
+      <div class="lg:col-span-4 flex flex-col gap-6 overflow-y-auto pr-2">
+        <div class="summary-card p-5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold uppercase tracking-wider mb-3 text-gray-400">Renda Mensal</h3>
+            <span class="badge">Supabase</span>
+          </div>
+          <div class="space-y-3">
+            <div><label class="text-xs text-gray-400 font-medium">Renda 1 (R$)</label><input type="number" id="salary1" step="0.01" class="form-input mt-1 w-full rounded-md p-2" placeholder="3500.00"></div>
+            <div><label class="text-xs text-gray-400 font-medium">Renda 2 (R$)</label><input type="number" id="salary2" step="0.01" class="form-input mt-1 w-full rounded-md p-2" placeholder="2800.00"></div>
+          </div>
+        </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-          (async () => {
-            // =================================================================================
-            // CONFIGURAÇÃO SUPABASE
-            // =================================================================================
-            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co';
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0';
-            const HOUSEHOLD_ID = 'default';
+        <div id="summary-section" class="space-y-4"></div>
 
-            if (SUPABASE_URL.includes('YOUR-PROJECT')) {
-            alert('Configure a SUPABASE_URL no topo do arquivo.');
+        <div class="summary-card p-4">
+          <h3 class="text-center text-gray-300 mb-3 text-md">Distribuição de Saídas</h3>
+          <canvas id="expensesChart"></canvas>
+        </div>
+
+        <div id="category-summary-section" class="space-y-2"></div>
+      </div>
+
+      <div class="lg:col-span-8 flex flex-col">
+        <div class="flex flex-wrap justify-between items-center gap-4 mb-5">
+          <h3 class="text-2xl">Lançamentos do Mês</h3>
+          <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 border rounded-lg p-1">
+              <button id="export-pdf-btn" class="hover:bg-gray-800 text-gray-300 font-semibold py-1 px-3 rounded-md text-sm">PDF</button>
+              <button id="export-excel-btn" class="hover:bg-gray-800 text-gray-300 font-semibold py-1 px-3 rounded-md text-sm">Excel</button>
+              <button id="export-json-btn" class="hover:bg-gray-800 text-gray-300 font-semibold py-1 px-3 rounded-md text-sm">Backup</button>
+              <label for="import-file-input" class="cursor-pointer hover:bg-gray-800 text-gray-300 font-semibold py-1 px-3 rounded-md text-sm">Importar</label>
+            </div>
+            <input type="file" id="import-file-input" class="hidden" accept=".json">
+            <button id="car-module-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold p-2 rounded-lg">🚗</button>
+            <button id="add-expense-btn" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Adicionar</button>
+          </div>
+        </div>
+        <div id="expenses-list" class="space-y-3 flex-grow overflow-y-auto pr-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="expense-modal-container" class="modal-container"></div>
+  <div id="car-modal-container" class="modal-container"></div>
+  <div id="toast-notification"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      (async () => {
+        // =========================================================================
+        // CHAVES (meta ou window.*)
+        // =========================================================================
+        const readMeta = (name) => document.querySelector(\`meta[name="\${name}"]\`)?.getAttribute('content') || '';
+        const SUPABASE_URL = window.SUPABASE_URL || readMeta('supabase-url');
+        const SUPABASE_KEY = window.SUPABASE_KEY || readMeta('supabase-key');
+        const GOOGLE_MAPS_API_KEY = window.GOOGLE_MAPS_API_KEY || readMeta('google-maps-key');
+        const HOUSEHOLD_ID = window.HOUSEHOLD_ID || 'default';
+
+        if (!SUPABASE_URL || !SUPABASE_KEY || SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_KEY.includes('YOUR_SUPABASE_ANON_KEY')) {
+          alert('Configure SUPABASE_URL e SUPABASE_KEY nas <meta> do <head> ou via window.* antes do script.');
+        }
+
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // =========================================================================
+        // CONSTANTES / ESTADO
+        // =========================================================================
+        const CATEGORIES = ['Mercado','Contas','Apartamento','Carro','Lazer','Delivery','Posto','Farmácia','Roupa','Escola','Cachorro - Pet','Poupança Filho','Reserva','Outros'];
+        const CATEGORY_ICONS = { 'Mercado':'🛒','Contas':'💡','Apartamento':'🏢','Carro':'🚗','Lazer':'🎉','Delivery':'🍔','Posto':'⛽','Farmácia':'💊','Roupa':'👕','Escola':'🎓','Cachorro - Pet':'🐶','Poupança Filho':'🐖','Reserva':'🏦','Outros':'📎' };
+        const CATEGORY_COLORS = { 'Mercado':'#f59e0b','Contas':'#10b981','Apartamento':'#a855f7','Carro':'#3b82f6','Lazer':'#ef4444','Delivery':'#d946ef','Posto':'orangered','Farmácia':'#84cc16','Roupa':'#6366f1','Escola':'#0ea5e9','Cachorro - Pet':'#a16207','Poupança Filho':'#ec4899','Reserva':'#14b8a6','Outros':'#6b7280' };
+
+        let expensesData = [];
+        let incomeData = {};
+        let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
+
+        let currentDate = new Date();
+        let currentEditingId = null;
+        window.myExpensesChart = null;
+
+        const DOM = {
+          mainContainer: document.getElementById('main-container'),
+          prevMonthBtn: document.getElementById('prev-month-btn'),
+          nextMonthBtn: document.getElementById('next-month-btn'),
+          monthHeader: document.getElementById('month-header'),
+          summarySection: document.getElementById('summary-section'),
+          categorySummarySection: document.getElementById('category-summary-section'),
+          expensesList: document.getElementById('expenses-list'),
+          addExpenseBtn: document.getElementById('add-expense-btn'),
+          modalContainer: document.getElementById('expense-modal-container'),
+          salary1Input: document.getElementById('salary1'),
+          salary2Input: document.getElementById('salary2'),
+          exportJsonBtn: document.getElementById('export-json-btn'),
+          exportPdfBtn: document.getElementById('export-pdf-btn'),
+          exportExcelBtn: document.getElementById('export-excel-btn'),
+          importInput: document.getElementById('import-file-input'),
+          toast: document.getElementById('toast-notification'),
+          carModuleBtn: document.getElementById('car-module-btn'),
+          carModalContainer: document.getElementById('car-modal-container'),
+          reportContent: document.getElementById('report-content')
+        };
+
+        // Helpers
+        const formatCurrency = (v) => (v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+        const toISODateString = (d) => d.toISOString().split('T')[0];
+        const getMonthYearKey = (date) => \`\${date.getFullYear()}-\${String(date.getMonth()+1).padStart(2,'0')}\`;
+        const showToast = (msg, type='success') => { DOM.toast.textContent = msg; DOM.toast.className=''; if(type!=='success') DOM.toast.classList.add('error'); DOM.toast.classList.add('show'); setTimeout(()=>DOM.toast.classList.remove('show'),3000); };
+
+        // =========================================================================
+        // SUPABASE - APP STATE
+        // =========================================================================
+        async function getAppState() {
+          const { data, error } = await supabase.from('app_state').select('data').eq('id', HOUSEHOLD_ID).maybeSingle();
+          if (error) { console.error(error); showToast('Erro ao carregar do Supabase.','error'); return null; }
+          if (!data) {
+            const initial = { expensesData: [], incomeData: {}, vehicleData: { profile:{}, fuelHistory:[], tripHistory:[], maintenanceHistory:[] } };
+            const { error: insErr } = await supabase.from('app_state').insert({ id: HOUSEHOLD_ID, data: initial });
+            if (insErr) { console.error(insErr); showToast('Erro ao inicializar no Supabase.','error'); return null; }
+            return initial;
+          }
+          return data.data || { expensesData: [], incomeData: {}, vehicleData: { profile:{}, fuelHistory:[], tripHistory:[], maintenanceHistory:[] } };
+        }
+        async function saveAppState() {
+          const state = { expensesData, incomeData, vehicleData };
+          const { error } = await supabase.from('app_state').upsert({ id: HOUSEHOLD_ID, data: state });
+          if (error) { console.error(error); showToast('Erro ao salvar no Supabase.','error'); }
+        }
+
+        // =========================================================================
+        // RENDER
+        // =========================================================================
+        const renderMonthView = () => {
+          const year = currentDate.getFullYear();
+          const month = currentDate.getMonth();
+          const monthKey = getMonthYearKey(currentDate);
+          DOM.monthHeader.textContent = new Date(year, month).toLocaleDateString('pt-BR',{ month:'long', year:'numeric' }).replace(/^\w/, c => c.toUpperCase());
+
+          const monthExpenses = expensesData.filter(e => {
+            const d = new Date(e.date);
+            return d.getFullYear() === year && d.getMonth() === month;
+          }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+          const monthIncome = incomeData[monthKey] || { salary1:'', salary2:'' };
+          DOM.salary1Input.value = monthIncome.salary1 || '';
+          DOM.salary2Input.value = monthIncome.salary2 || '';
+
+          renderSummary(monthExpenses, monthIncome);
+          renderExpenseList(monthExpenses);
+        };
+
+        const renderSummary = (expenses, income) => {
+          const totalExpenses = expenses.reduce((s, e) => s + (e.value || 0), 0);
+          const totalIncome = (parseFloat(income.salary1) || 0) + (parseFloat(income.salary2) || 0);
+          const balance = totalIncome - totalExpenses;
+
+          const summaryByCategory = CATEGORIES.map(category => ({
+            category, total: expenses.filter(e => e.category === category).reduce((sum, e) => sum + e.value, 0)
+          })).filter(i => i.total > 0).sort((a,b) => b.total - a.total);
+
+          DOM.summarySection.innerHTML = `
+            <div class="summary-card p-4 flex justify-between items-center">
+              <span class="font-medium text-gray-300">Renda Total</span>
+              <span class="font-semibold text-lg">${formatCurrency(totalIncome)}</span>
+            </div>
+            <div class="summary-card p-4 flex justify-between items-center">
+              <span class="font-medium text-gray-300">Saídas</span>
+              <span class="font-semibold text-lg text-brand">${formatCurrency(totalExpenses)}</span>
+            </div>
+            <div class="summary-card p-4 flex justify-between items-center bg-gray-700/50">
+              <span class="font-semibold">SALDO</span>
+              <span class="font-bold text-xl ${balance >= 0 ? 'text-green-400':'text-red-400'}">${formatCurrency(balance)}</span>
+            </div>`;
+
+          let categoryHTML = '';
+          if (summaryByCategory.length > 0) categoryHTML += '<h4 class="px-2 text-sm font-semibold uppercase tracking-wider text-gray-400">Análise de Saídas</h4>';
+          categoryHTML += summaryByCategory.map(item => `
+            <div class="summary-card p-3 flex justify-between items-center text-sm">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20;">
+                  <span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span>
+                </div>
+                <h4 class="font-medium">${item.category}</h4>
+              </div>
+              <p class="font-semibold">${formatCurrency(item.total)}</p>
+            </div>`).join('');
+          DOM.categorySummarySection.innerHTML = categoryHTML;
+
+          const ctx = document.getElementById('expensesChart').getContext('2d');
+          if (window.myExpensesChart) window.myExpensesChart.destroy();
+          if (expenses.length > 0) {
+            Chart.defaults.color = '#9ca3af';
+            window.myExpensesChart = new Chart(ctx, {
+              type: 'doughnut',
+              data: {
+                labels: summaryByCategory.map(i => i.category),
+                datasets: [{
+                  data: summaryByCategory.map(i => i.total),
+                  backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280'),
+                  hoverOffset: 8, borderWidth: 3, borderColor: '#1f2937'
+                }]
+              },
+              options: { responsive:true, cutout:'70%', plugins:{ legend:{ display:false } } }
+            });
+          } else {
+            ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height);
+          }
+        };
+
+        const renderExpenseList = (expenses) => {
+          if (expenses.length === 0) {
+            DOM.expensesList.innerHTML = `
+              <div class="h-full flex flex-col items-center justify-center text-center p-6 rounded-lg border-2 border-dashed">
+                <h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3>
+                <p class="mt-1 text-gray-400">Clique em "Adicionar" para começar.</p>
+              </div>`;
             return;
-            }
+          }
+          DOM.expensesList.innerHTML = expenses.map(exp => `
+            <div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}">
+              <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20">
+                <span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span>
+              </div>
+              <div class="flex-grow">
+                <p class="font-semibold">${exp.description}</p>
+                <p class="text-sm text-gray-400">${new Date(exp.date).toLocaleDateString('pt-BR',{ day:'2-digit', month:'long' })}</p>
+              </div>
+              <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
+            </div>`).join('');
+        };
 
-            // Linha Corrigida: Usando SUPABASE_KEY
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // =========================================================================
+        // MODAL DESPESA
+        // =========================================================================
+        const showExpenseModal = (expenseData = {}) => {
+          const { id, date, category, description, value } = expenseData;
+          currentEditingId = id || null;
+          const isEditing = currentEditingId !== null;
+          const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
 
-            // =================================================================================
-            // CONSTANTES / ESTADO (iguais ao original)
-            // =================================================================================
-            const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
-            const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
-            const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': '#ef4444', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
+          const modalHTML = `
+            <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg border border-gray-700">
+              <form id="expense-form-inner">
+                <div class="flex justify-between items-center p-5 border-b border-gray-700">
+                  <h3 class="text-xl font-bold">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
+                  <button type="button" class="modal-close-btn text-gray-300 hover:text-white text-2xl font-bold">&times;</button>
+                </div>
+                <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label for="form-date" class="block text-sm font-medium text-gray-300 mb-1">Data</label>
+                    <input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}">
+                  </div>
+                  <div>
+                    <label for="form-category" class="block text-sm font-medium text-gray-300 mb-1">Categoria</label>
+                    <select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label for="form-description" class="block text-sm font-medium text-gray-300 mb-1">Descrição</label>
+                    <input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}">
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label for="form-value" class="block text-sm font-medium text-gray-300 mb-1">Valor (R$)</label>
+                    <input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}">
+                  </div>
+                </div>
+                <div class="flex justify-between items-center p-4 bg-gray-900 rounded-b-xl">
+                  ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
+                  <div class="flex gap-4">
+                    <button type="button" class="modal-close-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 font-medium py-2 px-4 rounded-lg">Cancelar</button>
+                    <button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg">Salvar</button>
+                  </div>
+                </div>
+              </form>
+            </div>`;
 
-            let expensesData = [];
-            let incomeData = {};
-            let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
+          DOM.modalContainer.innerHTML = modalHTML;
+          DOM.mainContainer.classList.add('modal-open');
+          DOM.modalContainer.classList.add('visible');
+          setTimeout(() => document.getElementById('form-description').focus(), 50);
+        };
 
-            let currentDate = new Date();
-            let currentEditingId = null;
-            window.myExpensesChart = null;
+        const hideExpenseModal = () => {
+          DOM.mainContainer.classList.remove('modal-open');
+          DOM.modalContainer.classList.remove('visible');
+          setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
+        };
 
-            const DOM = {
-                body: document.body, mainContainer: document.getElementById('main-container'),
-                prevMonthBtn: document.getElementById('prev-month-btn'), nextMonthBtn: document.getElementById('next-month-btn'),
-                monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
-                categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
-                addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
-                salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
-                exportJsonBtn: document.getElementById('export-json-btn'), exportPdfBtn: document.getElementById('export-pdf-btn'),
-                exportExcelBtn: document.getElementById('export-excel-btn'), importInput: document.getElementById('import-file-input'),
-                toast: document.getElementById('toast-notification'),
-                carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
-            };
-
-            // =================================================================================
-            // HELPERS
-            // =================================================================================
-            const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            const toISODateString = (date) => date.toISOString().split('T')[0];
-            const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const showToast = (message, type = 'success') => {
-                DOM.toast.textContent = message;
-                DOM.toast.className = '';
-                DOM.toast.classList.toggle('error', type !== 'success');
-                DOM.toast.classList.add('show');
-                setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000);
-            };
-
-            // =================================================================================
-            // SUPABASE - APP STATE (jsonb)
-            // =================================================================================
-            async function getAppState() {
-                const { data, error } = await supabase
-                    .from('app_state')
-                    .select('data')
-                    .eq('id', HOUSEHOLD_ID)
-                    .maybeSingle();
-                if (error) {
-                    console.error('Erro ao buscar app_state:', error);
-                    showToast('Erro ao carregar dados do Supabase.', 'error');
-                    return null;
-                }
-                if (!data) {
-                    const initial = {
-                        expensesData: [],
-                        incomeData: {},
-                        vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }
-                    };
-                    const { error: insertErr } = await supabase
-                        .from('app_state')
-                        .insert({ id: HOUSEHOLD_ID, data: initial });
-                    if (insertErr) {
-                        console.error('Erro ao inicializar app_state:', insertErr);
-                        showToast('Erro ao inicializar dados no Supabase.', 'error');
-                        return null;
-                    }
-                    return initial;
-                }
-                return data.data || { expensesData: [], incomeData: {}, vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] } };
-            }
-
-            async function saveAppState() {
-                const state = { expensesData, incomeData, vehicleData };
-                const { error } = await supabase
-                    .from('app_state')
-                    .upsert({ id: HOUSEHOLD_ID, data: state });
-                if (error) {
-                    console.error('Erro ao salvar app_state:', error);
-                    showToast('Erro ao salvar no Supabase.', 'error');
-                }
-            }
-
-            // =================================================================================
-            // RENDERIZAÇÃO DE TELA (igual ao original)
-            // =================================================================================
-            const renderMonthView = () => {
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
-                const monthKey = getMonthYearKey(currentDate);
-                DOM.monthHeader.textContent = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
-
-                const monthExpenses = expensesData
-                    .filter(e => new Date(e.date).getFullYear() === year && new Date(e.date).getMonth() === month)
-                    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                const monthIncome = incomeData[monthKey] || { salary1: '', salary2: '' };
-                DOM.salary1Input.value = monthIncome.salary1 || '';
-                DOM.salary2Input.value = monthIncome.salary2 || '';
-
-                renderSummary(monthExpenses, monthIncome);
-                renderExpenseList(monthExpenses);
-            };
-
-            const renderSummary = (expenses, income) => {
-                const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.value || 0), 0);
-                const totalIncome = (parseFloat(income.salary1) || 0) + (parseFloat(income.salary2) || 0);
-                const balance = totalIncome - totalExpenses;
-
-                const summaryByCategory = CATEGORIES
-                    .map(category => ({
-                        category,
-                        total: expenses.filter(e => e.category === category).reduce((sum, e) => sum + e.value, 0)
-                    }))
-                    .filter(item => item.total > 0);
-
-                let balanceColor = balance >= 0 ? 'text-green-400' : 'text-red-400';
-                DOM.summarySection.innerHTML = `
-                    <div class="summary-card p-4 flex justify-between items-center">
-                        <span class="font-medium text-text-secondary">Renda Total</span>
-                        <span class="font-semibold text-lg">${formatCurrency(totalIncome)}</span>
-                    </div>
-                    <div class="summary-card p-4 flex justify-between items-center">
-                        <span class="font-medium text-text-secondary">Saídas</span>
-                        <span class="font-semibold text-lg text-brand">${formatCurrency(totalExpenses)}</span>
-                    </div>
-                    <div class="summary-card p-4 flex justify-between items-center bg-gray-700/50">
-                        <span class="font-semibold">SALDO</span>
-                        <span class="font-bold text-xl ${balanceColor}">${formatCurrency(balance)}</span>
-                    </div>`;
-
-                let categoryHTML = '';
-                if (summaryByCategory.length > 0) categoryHTML += '<h4 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider px-2">Análise de Saídas</h4>';
-                summaryByCategory
-                    .sort((a, b) => b.total - a.total)
-                    .forEach(item => {
-                        categoryHTML += `
-                        <div class="summary-card p-3 flex justify-between items-center text-sm">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20;">
-                                    <span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span>
-                                </div>
-                                <h4 class="font-medium">${item.category}</h4>
-                            </div>
-                            <p class="font-semibold">${formatCurrency(item.total)}</p>
-                        </div>`;
-                    });
-                DOM.categorySummarySection.innerHTML = categoryHTML;
-
-                const ctx = document.getElementById('expensesChart').getContext('2d');
-                if (window.myExpensesChart) window.myExpensesChart.destroy();
-                if (expenses.length > 0) {
-                    Chart.defaults.color = '#9ca3af';
-                    window.myExpensesChart = new Chart(ctx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: summaryByCategory.map(i => i.category),
-                            datasets: [{
-                                data: summaryByCategory.map(i => i.total),
-                                backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280'),
-                                hoverOffset: 8,
-                                borderWidth: 3,
-                                borderColor: '#1f2937'
-                            }]
-                        },
-                        options: { responsive: true, cutout: '70%', plugins: { legend: { display: false }, tooltip: { bodyFont: { size: 14 } } } }
-                    });
-                } else {
-                    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-                }
-            };
-
-            const renderExpenseList = (expenses) => {
-                if (expenses.length === 0) {
-                    DOM.expensesList.innerHTML = `
-                        <div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color">
-                            <h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3>
-                            <p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p>
-                        </div>`;
-                    return;
-                }
-                DOM.expensesList.innerHTML = expenses.map(exp => `
-                    <div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}">
-                        <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20">
-                            <span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span>
-                        </div>
-                        <div class="flex-grow">
-                            <p class="font-semibold">${exp.description}</p>
-                            <p class="text-sm text-text-secondary">${new Date(exp.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
-                        </div>
-                        <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
-                    </div>`).join('');
-            };
-
-            // =================================================================================
-            // MODAIS E FORMULÁRIOS
-            // =================================================================================
-            const showExpenseModal = (expenseData = {}) => {
-                const { id, date, category, description, value } = expenseData;
-                currentEditingId = id || null;
-                const isEditing = currentEditingId !== null;
-                const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
-
-                const modalHTML = `
-                    <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
-                        <form id="expense-form-inner">
-                            <div class="flex justify-between items-center p-5 border-b border-border-color">
-                                <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
-                                <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                            </div>
-                            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
-                                <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
-                                <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
-                                <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
-                            </div>
-                            <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
-                                ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
-                                <div class="flex gap-4"><button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div>
-                            </div>
-                        </form>
-                    </div>`;
-
-                DOM.modalContainer.innerHTML = modalHTML;
-                DOM.mainContainer.classList.add('modal-open');
-                DOM.modalContainer.classList.add('visible');
-                DOM.body.classList.add('modal-open-body');
-                setTimeout(() => document.getElementById('form-description').focus(), 50);
-            };
-
-            const hideExpenseModal = () => {
-                DOM.mainContainer.classList.remove('modal-open');
-                DOM.modalContainer.classList.remove('visible');
-                DOM.body.classList.remove('modal-open-body');
-                setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
-            };
-
-            // =================================================================================
-            // EVENTOS
-            // =================================================================================
-            const handleSalaryChange = async () => {
-                const mk = getMonthYearKey(currentDate);
-                if (!incomeData[mk]) incomeData[mk] = {};
-                incomeData[mk].salary1 = DOM.salary1Input.value;
-                incomeData[mk].salary2 = DOM.salary2Input.value;
-                await saveAppState();
-                renderMonthView();
-            };
-
-            DOM.salary1Input.addEventListener('input', handleSalaryChange);
-            DOM.salary2Input.addEventListener('input', handleSalaryChange);
-            DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
-            DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
-            DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
-            DOM.expensesList.addEventListener('click', (e) => {
-                const card = e.target.closest('.expense-card');
-                if (card) {
-                    const expense = expensesData.find(exp => String(exp.id) === String(card.dataset.id));
-                    if (expense) showExpenseModal(expense);
-                }
-            });
-
-            DOM.modalContainer.addEventListener('click', async (e) => {
-                if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
-
-                if (e.target.id === 'delete-btn' && currentEditingId) {
-                    if (confirm('Tem certeza que deseja excluir este lançamento?')) {
-                        expensesData = expensesData.filter(exp => String(exp.id) !== String(currentEditingId));
-                        await saveAppState();
-                        renderMonthView();
-                        hideExpenseModal();
-                        showToast('Lançamento excluído!', 'success');
-                    }
-                }
-            });
-
-            DOM.modalContainer.addEventListener('submit', async (e) => {
-                if (e.target.id === 'expense-form-inner') {
-                    e.preventDefault();
-                    const d = {
-                        id: currentEditingId || Date.now(),
-                        date: document.getElementById('form-date').value,
-                        description: document.getElementById('form-description').value,
-                        category: document.getElementById('form-category').value,
-                        value: parseFloat(document.getElementById('form-value').value) || 0
-                    };
-                    if (currentEditingId) {
-                        const i = expensesData.findIndex(exp => String(exp.id) === String(currentEditingId));
-                        if (i > -1) expensesData[i] = d;
-                    } else {
-                        expensesData.push(d);
-                    }
-                    await saveAppState();
-                    renderMonthView();
-                    hideExpenseModal();
-                    showToast('Lançamento salvo com sucesso!', 'success');
-                }
-            });
-
-            // =================================================================================
-            // EXPORTAÇÃO / IMPORTAÇÃO (JSON simples usando o estado atual)
-            // =================================================================================
-            DOM.exportJsonBtn.addEventListener('click', async () => {
-                try {
-                    const state = { expensesData, incomeData, vehicleData };
-                    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `backup_financeiro_${new Date().toISOString().slice(0,10)}.json`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                    showToast('Backup exportado!');
-                } catch (err) {
-                    console.error(err);
-                    showToast('Falha ao exportar backup.', 'error');
-                }
-            });
-
-            DOM.importInput.addEventListener('change', async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                try {
-                    const text = await file.text();
-                    const parsed = JSON.parse(text);
-                    expensesData = Array.isArray(parsed.expensesData) ? parsed.expensesData : [];
-                    incomeData = parsed.incomeData || {};
-                    vehicleData = parsed.vehicleData || { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
-                    await saveAppState();
-                    renderMonthView();
-                    showToast('Backup importado com sucesso!');
-                } catch (err) {
-                    console.error(err);
-                    showToast('Arquivo inválido.', 'error');
-                } finally {
-                    e.target.value = '';
-                }
-            });
-
-            // =================================================================================
-            // MÓDULO VEICULAR (usando vehicleData dentro do estado Supabase)
-            // =================================================================================
-            const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
-
-            const getLatestOdometer = () => {
-                const allEntries = [
-                    ...vehicleData.fuelHistory,
-                    ...vehicleData.maintenanceHistory.map(m => ({ odometer: m.lastServiceKm }))
-                ];
-                if (allEntries.length === 0) return 0;
-                return Math.max(...allEntries.map(e => e.odometer || 0));
-            };
-
-            const calculateAverageConsumption = () => {
-                const sortedFuel = [...vehicleData.fuelHistory].sort((a,b) => a.odometer - b.odometer);
-                if (sortedFuel.length < 2) return 0;
-                let totalKm = sortedFuel[sortedFuel.length - 1].odometer - sortedFuel[0].odometer;
-                let totalLiters = sortedFuel.slice(1).reduce((sum, log) => sum + log.liters, 0);
-                return totalLiters > 0 ? (totalKm / totalLiters) : 0;
-            };
-
-            const showCarModal = () => {
-                const modalHTML = `
-                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;">
-                    <div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
-                        <div class="flex items-center gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-brand" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" /><path d="M8 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                            <h3 class="text-xl font-display">Painel Inteligente do Veículo</h3>
-                        </div>
-                        <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                    </div>
-                    <div class="p-4 border-b border-border-color flex-shrink-0">
-                        <div id="car-tabs" class="flex items-center gap-2 sm:gap-4 overflow-x-auto">
-                            <button class="tab-btn active" data-tab="overview">Visão Geral</button>
-                            <button class="tab-btn" data-tab="profile">Perfil</button>
-                            <button class="tab-btn" data-tab="fuel">Abastecimentos</button>
-                            <button class="tab-btn" data-tab="trips">Viagens</button>
-                            <button class="tab-btn" data-tab="maintenance">Manutenções</button>
-                        </div>
-                    </div>
-                    <div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div>
-                </div>`;
-                DOM.carModalContainer.innerHTML = modalHTML;
-                DOM.mainContainer.classList.add('modal-open');
-                DOM.carModalContainer.classList.add('visible');
-                DOM.body.classList.add('modal-open-body');
-                renderCarTab('overview');
-            };
-
-            const hideCarModal = () => {
-                DOM.mainContainer.classList.remove('modal-open');
-                DOM.carModalContainer.classList.remove('visible');
-                DOM.body.classList.remove('modal-open-body');
-                setTimeout(() => { DOM.carModalContainer.innerHTML = ''; }, 300);
-            };
-
-            const renderCarTab = (tabId) => {
-                const contentEl = document.getElementById('car-modal-content');
-                const latestOdometer = getLatestOdometer();
-                let html = '';
-                switch(tabId) {
-                    case 'overview': {
-                        const avgConsumption = calculateAverageConsumption();
-                        const oilChangeInterval = vehicleData.profile?.oilChangeKmInterval || 10000;
-                        const lastOilChangeKm = vehicleData.profile?.lastOilChangeKm || 0;
-                        const kmSinceOilChange = latestOdometer - lastOilChangeKm;
-                        const oilProgress = Math.min((kmSinceOilChange / oilChangeInterval) * 100, 100);
-                        const oilKmRemaining = Math.max(0, oilChangeInterval - kmSinceOilChange);
-                        let oilProgressColor = 'bg-indigo-500';
-                        if (oilProgress > 80) oilProgressColor = 'bg-yellow-500';
-                        if (oilProgress >= 100) oilProgressColor = 'bg-red-500';
-                        html = `
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">${latestOdometer.toLocaleString('pt-BR')} km</p></div>
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Consumo Médio</h4><p class="text-2xl font-bold">${avgConsumption.toFixed(2)} km/L</p></div>
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">${oilKmRemaining.toLocaleString('pt-BR')} km</p></div>
-                            </div>
-                            <div class="space-y-4">
-                                <h3 class="font-display text-lg">Alertas de Manutenção</h3>
-                                <div class="bg-background-color p-4 rounded-lg">
-                                    <div class="flex justify-between items-center mb-1">
-                                        <span class="font-semibold">Troca de Óleo</span>
-                                        <span class="text-sm font-medium ${oilProgress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceOilChange.toLocaleString('pt-BR')} / ${oilChangeInterval.toLocaleString('pt-BR')} km</span>
-                                    </div>
-                                    <div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${oilProgressColor}" style="width: ${oilProgress}%"></div></div>
-                                </div>
-                                ${vehicleData.maintenanceHistory.map(maint => {
-                                    const kmSinceService = latestOdometer - maint.lastServiceKm;
-                                    const progress = Math.min((kmSinceService / maint.kmInterval) * 100, 100);
-                                    const kmRemaining = Math.max(0, maint.kmInterval - kmSinceService);
-                                    let progressColor = 'bg-indigo-500';
-                                    if (progress > 80) progressColor = 'bg-yellow-500';
-                                    if (progress >= 100) progressColor = 'bg-red-500';
-                                    return `
-                                    <div class="bg-background-color p-4 rounded-lg">
-                                        <div class="flex justify-between items-center mb-1">
-                                            <span class="font-semibold">${maint.item} <small class="text-text-secondary">(próxima em ${kmRemaining.toLocaleString('pt-BR')} km)</small></span>
-                                            <span class="text-sm font-medium ${progress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceService.toLocaleString('pt-BR')} / ${maint.kmInterval.toLocaleString('pt-BR')} km</span>
-                                        </div>
-                                        <div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${progressColor}" style="width: ${progress}%"></div></div>
-                                    </div>`;
-                                }).join('')}
-                            </div>`;
-                        break;
-                    }
-                    case 'profile': {
-                        const p = vehicleData.profile || {};
-                        html = `<form id="car-profile-form" class="space-y-4">
-                                <h3 class="font-display text-lg">Perfil do Veículo</h3>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="${p.model || ''}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="${p.plate || ''}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Intervalo Troca de Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="${p.oilChangeKmInterval || '10000'}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Última Troca de Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="${p.lastOilChangeKm || '0'}"></div>
-                                </div>
-                                <div class="text-right pt-2"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Salvar Perfil</button></div>
-                            </form>`;
-                        break;
-                    }
-                    case 'fuel': {
-                        const sortedFuel = [...vehicleData.fuelHistory].sort((a,b) => b.odometer - a.odometer);
-                        html = `<form id="fuel-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Registrar Abastecimento</h3>
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
-                                    <div><label class="block text-sm text-text-secondary">Odômetro Atual</label><input type="number" id="fuel-odometer" placeholder="${getLatestOdometer()}" class="form-input w-full"></div>
-                                    <div><label class="block text-sm text-text-secondary">Litros (L)</label><input type="number" step="0.01" id="fuel-liters" class="form-input w-full"></div>
-                                    <div><label class="block text-sm text-text-secondary">Valor Total (R$)</label><input type="number" step="0.01" id="fuel-total-value" class="form-input w-full"></div>
-                                </div>
-                                <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar</button></div>
-                            </form>
-                            <h3 class="font-display text-lg mb-3">Histórico de Abastecimentos</h3>
-                            <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-                            ${sortedFuel.map((current, index) => {
-                                const previous = sortedFuel[index + 1];
-                                let efficiencyText = `<span class="text-xs text-text-secondary">-- km/L</span>`;
-                                if (previous) {
-                                    const dist = current.odometer - previous.odometer;
-                                    const liters = current.liters;
-                                    if (dist > 0 && liters > 0) {
-                                        efficiencyText = `<span class="font-semibold text-green-400">${(dist / liters).toFixed(2)} km/L</span>`;
-                                    }
-                                }
-                                return `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
-                                    <div>
-                                        <p class="font-semibold">${new Date(current.date).toLocaleDateString('pt-BR')}</p>
-                                        <p class="text-text-secondary">${current.odometer.toLocaleString('pt-BR')} km &bull; ${current.liters} L &bull; ${formatCurrency(current.totalValue)}</p>
-                                    </div>
-                                    ${efficiencyText}
-                                </div>`;
-                            }).join('') || `<p class="text-text-secondary text-center p-4">Nenhum registro.</p>`}
-                            </div>`;
-                        break;
-                    }
-                    case 'trips': {
-                        const sortedTrips = [...vehicleData.tripHistory].sort((a,b) => new Date(b.date) - new Date(a.date));
-                        html = `
-                            <form id="trip-calculator-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Calculadora de Rota e Custo (API Mapbox)</h3>
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div><label class="block text-sm text-text-secondary">Origem</label><input type="text" id="trip-origin" class="form-input w-full"></div>
-                                    <div><label class="block text-sm text-text-secondary">Destino</label><input type="text" id="trip-destination" class="form-input w-full"></div>
-                                    <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Preço do Combustível (R$/L)</label><input type="number" step="0.01" id="trip-fuel-price" class="form-input w-full"></div>
-                                </div>
-                                <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Calcular Rota</button></div>
-                            </form>
-                            <div id="trip-result" class="mb-6 hidden"></div>
-
-                            <form id="trip-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Registro Manual de Viagens</h3>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="trip-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
-                                    <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Descrição</label><input type="text" id="trip-desc" placeholder="Viagem para a praia" class="form-input w-full"></div>
-                                    <div><label class="block text-sm text-text-secondary">Distância (km)</label><input type="number" id="trip-dist" class="form-input w-full"></div>
-                                </div>
-                                <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar Viagem</button></div>
-                            </form>
-
-                            <h3 class="font-display text-lg mb-3">Histórico de Viagens</h3>
-                            <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            ${sortedTrips.map(trip => `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
-                                <div><p class="font-semibold">${trip.description}</p><p class="text-text-secondary">${new Date(trip.date).toLocaleDateString('pt-BR')}</p></div>
-                                <p class="font-semibold">${trip.distance.toLocaleString('pt-BR')} km</p>
-                            </div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma viagem registrada.</p>`}
-                            </div>`;
-                        break;
-                    }
-                    case 'maintenance': {
-                        html = `<form id="maint-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
-                                <h3 class="font-display text-lg">Agendar Nova Manutenção</h3>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Item</label><input type="text" id="maint-item" placeholder="Troca de Pneus" class="form-input w-full"></div>
-                                    <div><label class="block text-sm text-text-secondary">Intervalo (km)</label><input type="number" id="maint-interval" placeholder="40000" class="form-input w-full"></div>
-                                </div>
-                                <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Agendar</button></div>
-                            </form>
-                            <h3 class="font-display text-lg mb-3">Manutenções Agendadas</h3>
-                            <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-                            ${vehicleData.maintenanceHistory.map(maint => `<div class="bg-background-color p-3 rounded-lg text-sm">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <p class="font-semibold">${maint.item}</p>
-                                        <p class="text-text-secondary">Último serviço em ${maint.lastServiceKm.toLocaleString('pt-BR')} km</p>
-                                    </div>
-                                    <div class="flex gap-2">
-                                        <button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="${maint.id}">
-                                            <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                        </button>
-                                        <button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="${maint.id}">
-                                           <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma manutenção agendada.</p>`}
-                            </div>`;
-                        break;
-                    }
-                }
-                contentEl.innerHTML = html;
-            };
-
-            const formatDuration = (seconds) => {
-                const hours = Math.floor(seconds / 3600);
-                const minutes = Math.floor((seconds % 3600) / 60);
-                let str = '';
-                if (hours > 0) str += `${hours}h `;
-                if (minutes > 0) str += `${minutes}min`;
-                return str.trim() || '0min';
-            };
-
-            const calculateTripDetails = async (origin, destination, fuelPrice) => {
-                if (MAPBOX_ACCESS_TOKEN === 'COLE_SEU_ACCESS_TOKEN_DO_MAPBOX_AQUI' || !MAPBOX_ACCESS_TOKEN) {
-                    showToast('Access Token do Mapbox não configurado.', 'error'); return;
-                }
-                const consumption = calculateAverageConsumption();
-                if (consumption <= 0) {
-                    showToast('Calcule o consumo médio primeiro registrando ao menos 2 abastecimentos.', 'error'); return;
-                }
-                const resultDiv = document.getElementById('trip-result');
-                resultDiv.classList.remove('hidden');
-                resultDiv.innerHTML = `<p class="text-center p-4">Calculando...</p>`;
-                try {
-                    const geocodeUrl = (place) => `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(place)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1`;
-                    const originResponse = await fetch(geocodeUrl(origin));
-                    const originData = await originResponse.json();
-                    if (!originData.features || originData.features.length === 0) throw new Error(`Endereço de origem não encontrado: ${origin}`);
-                    const originCoords = originData.features[0].center;
-                    const destResponse = await fetch(geocodeUrl(destination));
-                    const destData = await destResponse.json();
-                    if (!destData.features || destData.features.length === 0) throw new Error(`Endereço de destino não encontrado: ${destination}`);
-                    const destCoords = destData.features[0].center;
-                    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${originCoords[0]},${originCoords[1]};${destCoords[0]},${destCoords[1]}?access_token=${MAPBOX_ACCESS_TOKEN}`;
-                    const directionsResponse = await fetch(directionsUrl);
-                    const directionsData = await directionsResponse.json();
-                    if (directionsData.code !== 'Ok') throw new Error(directionsData.message || 'Não foi possível calcular a rota.');
-                    const route = directionsData.routes[0];
-                    const distanceInKm = route.distance / 1000;
-                    const durationText = formatDuration(route.duration);
-                    const cost = (distanceInKm / consumption) * fuelPrice;
-                    resultDiv.innerHTML = `
-                        <div class="p-4 rounded-lg bg-background-color border border-border-color">
-                            <h5 class="font-bold text-lg mb-2">Resultado da Rota (via Mapbox)</h5>
-                            <div class="grid grid-cols-3 gap-2 text-center">
-                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
-                                <div><p class="text-sm text-text-secondary">Duração Est.</p><p class="font-bold text-xl">${durationText}</p></div>
-                                <div><p class="text-sm text-text-secondary">Custo Est.</p><p class="font-bold text-xl text-brand">${formatCurrency(cost)}</p></div>
-                            </div>
-                            <div class="text-center mt-4">
-                                <button id="add-trip-as-expense" data-value="${cost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
-                            </div>
-                        </div>`;
-                } catch(error) {
-                    console.error("Erro na API do Mapbox:", error);
-                    resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
-                    showToast('Erro ao calcular a rota.', 'error');
-                }
-            };
-
-            DOM.carModuleBtn.addEventListener('click', showCarModal);
-
-            DOM.carModalContainer.addEventListener('click', async e => {
-                if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
-
-                if (e.target.closest('.tab-btn')) {
-                    const tabBtn = e.target.closest('.tab-btn');
-                    document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-                    tabBtn.classList.add('active');
-                    renderCarTab(tabBtn.dataset.tab);
-                }
-
-                if (e.target.id === 'add-trip-as-expense') {
-                    const value = parseFloat(e.target.dataset.value);
-                    const description = e.target.dataset.desc;
-                    hideCarModal();
-                    showExpenseModal({ category: 'Carro', description: description, value: value });
-                }
-
-                if (e.target.closest('.maint-done-btn')) {
-                    const id = e.target.closest('.maint-done-btn').dataset.id;
-                    const latestOdometer = getLatestOdometer();
-                    const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, latestOdometer);
-                    if (newOdometer && !isNaN(newOdometer)) {
-                        const idx = vehicleData.maintenanceHistory.findIndex(m => String(m.id) === String(id));
-                        vehicleData.maintenanceHistory[idx].lastServiceKm = parseInt(newOdometer);
-                        await saveAppState();
-                        renderCarTab('maintenance');
-                        showToast('Manutenção registrada com sucesso!');
-                    }
-                }
-                if (e.target.closest('.maint-delete-btn')) {
-                    const id = e.target.closest('.maint-delete-btn').dataset.id;
-                    if (confirm('Tem certeza que deseja excluir este agendamento?')) {
-                        vehicleData.maintenanceHistory = vehicleData.maintenanceHistory.filter(m => String(m.id) !== String(id));
-                        await saveAppState();
-                        renderCarTab('maintenance');
-                        showToast('Agendamento excluído.');
-                    }
-                }
-            });
-
-            DOM.carModalContainer.addEventListener('submit', async e => {
-                e.preventDefault();
-                switch(e.target.id) {
-                    case 'car-profile-form':
-                        vehicleData.profile = {
-                            model: document.getElementById('car-model').value,
-                            plate: document.getElementById('car-plate').value,
-                            oilChangeKmInterval: parseInt(document.getElementById('car-oil-interval').value) || 10000,
-                            lastOilChangeKm: parseInt(document.getElementById('car-last-oil').value) || 0
-                        };
-                        await saveAppState(); showToast('Perfil salvo com sucesso!');
-                        break;
-                    case 'fuel-log-form': {
-                        const newFuelLog = {
-                            id: Date.now(),
-                            date: document.getElementById('fuel-date').value,
-                            odometer: parseInt(document.getElementById('fuel-odometer').value),
-                            liters: parseFloat(document.getElementById('fuel-liters').value),
-                            totalValue: parseFloat(document.getElementById('fuel-total-value').value)
-                        };
-                        if (!newFuelLog.odometer || !newFuelLog.liters || !newFuelLog.totalValue) { showToast('Preencha todos os campos.', 'error'); return; }
-                        vehicleData.fuelHistory.push(newFuelLog);
-                        await saveAppState(); showToast('Abastecimento registrado!');
-                        e.target.reset(); document.getElementById('fuel-date').value = toISODateString(new Date());
-                        renderCarTab('fuel');
-                        break;
-                    }
-                    case 'trip-log-form': {
-                        const newTrip = {
-                            id: Date.now(),
-                            date: document.getElementById('trip-date').value,
-                            description: document.getElementById('trip-desc').value,
-                            distance: parseInt(document.getElementById('trip-dist').value)
-                        };
-                        if (!newTrip.description || !newTrip.distance) { showToast('Preencha todos os campos.', 'error'); return; }
-                        vehicleData.tripHistory.push(newTrip);
-                        await saveAppState(); showToast('Viagem registrada!');
-                        e.target.reset(); document.getElementById('trip-date').value = toISODateString(new Date());
-                        renderCarTab('trips');
-                        break;
-                    }
-                    case 'maint-log-form': {
-                        const newMaint = {
-                            id: Date.now(),
-                            item: document.getElementById('maint-item').value,
-                            kmInterval: parseInt(document.getElementById('maint-interval').value),
-                            lastServiceKm: getLatestOdometer()
-                        };
-                        if (!newMaint.item || !newMaint.kmInterval) { showToast('Preencha todos os campos.', 'error'); return; }
-                        vehicleData.maintenanceHistory.push(newMaint);
-                        await saveAppState(); showToast('Manutenção agendada!');
-                        e.target.reset();
-                        renderCarTab('maintenance');
-                        break;
-                    }
-                    case 'trip-calculator-form': {
-                        const origin = document.getElementById('trip-origin').value;
-                        const destination = document.getElementById('trip-destination').value;
-                        const fuelPrice = parseFloat(document.getElementById('trip-fuel-price').value);
-                        if (!origin || !destination || !fuelPrice) { showToast('Preencha todos os campos da rota.', 'error'); return; }
-                        await calculateTripDetails(origin, destination, fuelPrice);
-                        break;
-                    }
-                }
-            });
-
-            // =================================================================================
-            // CARGA INICIAL DO ESTADO
-            // =================================================================================
-            const initial = await getAppState();
-            if (initial) {
-                expensesData = Array.isArray(initial.expensesData) ? initial.expensesData : [];
-                incomeData = initial.incomeData || {};
-                vehicleData = initial.vehicleData || { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
-            }
-            renderMonthView();
-          })();
+        // =========================================================================
+        // EVENTOS BÁSICOS
+        // =========================================================================
+        const handleSalaryChange = async () => {
+          const mk = getMonthYearKey(currentDate);
+          if (!incomeData[mk]) incomeData[mk] = {};
+          incomeData[mk].salary1 = DOM.salary1Input.value;
+          incomeData[mk].salary2 = DOM.salary2Input.value;
+          await saveAppState(); renderMonthView();
+        };
+        DOM.salary1Input.addEventListener('input', handleSalaryChange);
+        DOM.salary2Input.addEventListener('input', handleSalaryChange);
+        DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
+        DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
+        DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
+        DOM.expensesList.addEventListener('click', (e) => {
+          const card = e.target.closest('.expense-card');
+          if (card) {
+            const expense = expensesData.find(exp => String(exp.id) === String(card.dataset.id));
+            if (expense) showExpenseModal(expense);
+          }
         });
-    </script>
+
+        DOM.modalContainer.addEventListener('click', async (e) => {
+          if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
+
+          if (e.target.id === 'delete-btn' && currentEditingId) {
+            if (confirm('Tem certeza que deseja excluir este lançamento?')) {
+              expensesData = expensesData.filter(exp => String(exp.id) !== String(currentEditingId));
+              await saveAppState(); renderMonthView(); hideExpenseModal(); showToast('Lançamento excluído!');
+            }
+          }
+        });
+
+        DOM.modalContainer.addEventListener('submit', async (e) => {
+          if (e.target.id === 'expense-form-inner') {
+            e.preventDefault();
+            const d = {
+              id: currentEditingId || Date.now(),
+              date: document.getElementById('form-date').value,
+              description: document.getElementById('form-description').value,
+              category: document.getElementById('form-category').value,
+              value: parseFloat(document.getElementById('form-value').value) || 0
+            };
+            if (currentEditingId) {
+              const i = expensesData.findIndex(exp => String(exp.id) === String(currentEditingId));
+              if (i > -1) expensesData[i] = d;
+            } else {
+              expensesData.push(d);
+            }
+            await saveAppState(); renderMonthView(); hideExpenseModal(); showToast('Lançamento salvo com sucesso!');
+          }
+        });
+
+        // =========================================================================
+        // EXPORTAÇÃO / IMPORTAÇÃO
+        // =========================================================================
+        DOM.exportJsonBtn.addEventListener('click', async () => {
+          try {
+            const state = { expensesData, incomeData, vehicleData };
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = \`backup_financeiro_\${new Date().toISOString().slice(0,10)}.json\`;
+            document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            showToast('Backup exportado!');
+          } catch (err) { console.error(err); showToast('Falha ao exportar backup.','error'); }
+        });
+
+        // ---- PDF ----
+        DOM.exportPdfBtn.addEventListener('click', async () => {
+          try {
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF('p','mm','a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+
+            const target = DOM.reportContent;
+            const canvas = await html2canvas(target, { scale: 2, backgroundColor: '#111827' });
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = pageWidth;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pageHeight;
+
+            while (heightLeft > 0) {
+              position = heightLeft - imgHeight;
+              pdf.addPage();
+              pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+              heightLeft -= pageHeight;
+            }
+
+            pdf.save(\`relatorio_financeiro_\${new Date().toISOString().slice(0,10)}.pdf\`);
+            showToast('PDF gerado!');
+          } catch (err) { console.error(err); showToast('Falha ao gerar PDF.','error'); }
+        });
+
+        // ---- EXCEL ----
+        function exportToExcel() {
+          const wb = XLSX.utils.book_new();
+          // Despesas
+          const expRows = [['Data','Categoria','Descrição','Valor (R$)']]
+            .concat(expensesData.map(e => [e.date, e.category, e.description, e.value]));
+          const wsExp = XLSX.utils.aoa_to_sheet(expRows);
+          XLSX.utils.book_append_sheet(wb, wsExp, 'Despesas');
+
+          // Renda
+          const incRows = [['Mês','Renda 1','Renda 2']]
+            .concat(Object.entries(incomeData).map(([k,v]) => [k, v.salary1 || '', v.salary2 || '']));
+          const wsInc = XLSX.utils.aoa_to_sheet(incRows);
+          XLSX.utils.book_append_sheet(wb, wsInc, 'Renda');
+
+          // Veículo
+          const fuelRows = [['Data','Odômetro','Litros','Valor Total (R$)']]
+            .concat((vehicleData.fuelHistory||[]).map(f => [f.date, f.odometer, f.liters, f.totalValue]));
+          const wsFuel = XLSX.utils.aoa_to_sheet(fuelRows);
+          XLSX.utils.book_append_sheet(wb, wsFuel, 'Abastecimentos');
+
+          const tripRows = [['Data','Descrição','Distância (km)']]
+            .concat((vehicleData.tripHistory||[]).map(t => [t.date, t.description, t.distance]));
+          const wsTrips = XLSX.utils.aoa_to_sheet(tripRows);
+          XLSX.utils.book_append_sheet(wb, wsTrips, 'Viagens');
+
+          const maintRows = [['Item','Intervalo (km)','Último Serviço (km)']]
+            .concat((vehicleData.maintenanceHistory||[]).map(m => [m.item, m.kmInterval, m.lastServiceKm]));
+          const wsMaint = XLSX.utils.aoa_to_sheet(maintRows);
+          XLSX.utils.book_append_sheet(wb, wsMaint, 'Manutenções');
+
+          XLSX.writeFile(wb, \`financeiro_\${new Date().toISOString().slice(0,10)}.xlsx\`);
+        }
+        DOM.exportExcelBtn.addEventListener('click', () => {
+          try { exportToExcel(); showToast('Excel gerado!'); }
+          catch (err) { console.error(err); showToast('Falha ao gerar Excel.','error'); }
+        });
+
+        DOM.importInput.addEventListener('change', async (e) => {
+          const file = e.target.files?.[0]; if (!file) return;
+          try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+            expensesData = Array.isArray(parsed.expensesData) ? parsed.expensesData : [];
+            incomeData = parsed.incomeData || {};
+            vehicleData = parsed.vehicleData || { profile:{}, fuelHistory:[], tripHistory:[], maintenanceHistory:[] };
+            await saveAppState(); renderMonthView(); showToast('Backup importado com sucesso!');
+          } catch (err) { console.error(err); showToast('Arquivo inválido.','error'); }
+          finally { e.target.value = ''; }
+        });
+
+        // =========================================================================
+        // MÓDULO VEICULAR + ROTAS COM PEDÁGIOS (Google)
+        // =========================================================================
+        const getLatestOdometer = () => {
+          const allEntries = [...vehicleData.fuelHistory, ...vehicleData.maintenanceHistory.map(m=>({ odometer:m.lastServiceKm }))];
+          if (allEntries.length === 0) return 0;
+          return Math.max(...allEntries.map(e => e.odometer || 0));
+        };
+        const calculateAverageConsumption = () => {
+          const sortedFuel = [...vehicleData.fuelHistory].sort((a,b)=>a.odometer-b.odometer);
+          if (sortedFuel.length < 2) return 0;
+          const totalKm = sortedFuel[sortedFuel.length - 1].odometer - sortedFuel[0].odometer;
+          const totalLiters = sortedFuel.slice(1).reduce((s, l) => s + l.liters, 0);
+          return totalLiters > 0 ? (totalKm / totalLiters) : 0;
+        };
+        const showCarModal = () => {
+          const modalHTML = `
+          <div class="bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl border border-gray-700 flex flex-col" style="max-height: 90vh;">
+            <div class="flex justify-between items-center p-4 border-b border-gray-700">
+              <div class="flex items-center gap-3">
+                <span class="text-brand text-xl">🚗</span>
+                <h3 class="text-xl font-bold">Painel Inteligente do Veículo</h3>
+              </div>
+              <button type="button" class="modal-close-btn text-gray-300 hover:text-white text-2xl font-bold">&times;</button>
+            </div>
+            <div class="p-4 border-b border-gray-700">
+              <div id="car-tabs" class="flex items-center gap-2 overflow-x-auto">
+                <button class="tab-btn active" data-tab="overview">Visão Geral</button>
+                <button class="tab-btn" data-tab="profile">Perfil</button>
+                <button class="tab-btn" data-tab="fuel">Abastecimentos</button>
+                <button class="tab-btn" data-tab="trips">Viagens</button>
+                <button class="tab-btn" data-tab="maintenance">Manutenções</button>
+              </div>
+            </div>
+            <div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div>
+          </div>`;
+          DOM.carModalContainer.innerHTML = modalHTML;
+          DOM.mainContainer.classList.add('modal-open');
+          DOM.carModalContainer.classList.add('visible');
+          renderCarTab('overview');
+        };
+        const hideCarModal = () => {
+          DOM.mainContainer.classList.remove('modal-open');
+          DOM.carModalContainer.classList.remove('visible');
+          setTimeout(() => { DOM.carModalContainer.innerHTML=''; }, 300);
+        };
+        const renderCarTab = (tabId) => {
+          const contentEl = document.getElementById('car-modal-content');
+          const latestOdometer = getLatestOdometer();
+          let html = '';
+          switch (tabId) {
+            case 'overview': {
+              const avg = calculateAverageConsumption();
+              const oilChangeInterval = vehicleData.profile?.oilChangeKmInterval || 10000;
+              const lastOilChangeKm = vehicleData.profile?.lastOilChangeKm || 0;
+              const kmSinceOil = latestOdometer - lastOilChangeKm;
+              const oilRemaining = Math.max(0, oilChangeInterval - kmSinceOil);
+              html = `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
+                  <div class="bg-gray-900 p-4 rounded-lg"><h4 class="text-sm font-semibold text-gray-400 uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">${latestOdometer.toLocaleString('pt-BR')} km</p></div>
+                  <div class="bg-gray-900 p-4 rounded-lg"><h4 class="text-sm font-semibold text-gray-400 uppercase">Consumo Médio</h4><p class="text-2xl font-bold">${avg.toFixed(2)} km/L</p></div>
+                  <div class="bg-gray-900 p-4 rounded-lg"><h4 class="text-sm font-semibold text-gray-400 uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">${oilRemaining.toLocaleString('pt-BR')} km</p></div>
+                </div>`;
+              break;
+            }
+            case 'profile': {
+              const p = vehicleData.profile || {};
+              html = `<form id="car-profile-form" class="space-y-4">
+                <h3 class="text-lg font-bold">Perfil do Veículo</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><label class="block text-sm text-gray-300">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="${p.model || ''}"></div>
+                  <div><label class="block text-sm text-gray-300">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="${p.plate || ''}"></div>
+                  <div><label class="block text-sm text-gray-300">Intervalo Troca Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="${p.oilChangeKmInterval || '10000'}"></div>
+                  <div><label class="block text-sm text-gray-300">Última Troca Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="${p.lastOilChangeKm || '0'}"></div>
+                </div>
+                <div class="text-right"><button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Salvar Perfil</button></div>
+              </form>`;
+              break;
+            }
+            case 'fuel': {
+              const sortedFuel = [...vehicleData.fuelHistory].sort((a,b)=>b.odometer - a.odometer);
+              html = `<form id="fuel-log-form" class="space-y-4 p-4 border border-gray-700 rounded-lg mb-6">
+                <h3 class="text-lg font-bold">Registrar Abastecimento</h3>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div><label class="block text-sm text-gray-300">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
+                  <div><label class="block text-sm text-gray-300">Odômetro</label><input type="number" id="fuel-odometer" class="form-input w-full" placeholder="${getLatestOdometer()}"></div>
+                  <div><label class="block text-sm text-gray-300">Litros</label><input type="number" id="fuel-liters" step="0.01" class="form-input w-full"></div>
+                  <div><label class="block text-sm text-gray-300">Valor Total (R$)</label><input type="number" id="fuel-total-value" step="0.01" class="form-input w-full"></div>
+                </div>
+                <div class="text-right"><button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Adicionar</button></div>
+              </form>
+              <h3 class="text-lg font-bold mb-3">Histórico</h3>
+              <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+                ${sortedFuel.map((f,i)=>{
+                  const prev = sortedFuel[i+1];
+                  let eff = '<span class="text-xs text-gray-400">-- km/L</span>';
+                  if (prev) {
+                    const dist = f.odometer - prev.odometer;
+                    if (dist>0 && f.liters>0) eff = '<span class="font-semibold text-green-400">'+(dist/f.liters).toFixed(2)+' km/L</span>';
+                  }
+                  return `<div class="bg-gray-900 p-3 rounded-lg flex justify-between items-center text-sm">
+                    <div><p class="font-semibold">${new Date(f.date).toLocaleDateString('pt-BR')}</p><p class="text-gray-400">${f.odometer.toLocaleString('pt-BR')} km • ${f.liters} L • ${formatCurrency(f.totalValue)}</p></div>${eff}
+                  </div>`;
+                }).join('') || '<p class="text-gray-400 text-center p-4">Nenhum registro.</p>'}
+              </div>`;
+              break;
+            }
+            case 'trips': {
+              const sortedTrips = [...vehicleData.tripHistory].sort((a,b)=> new Date(b.date)-new Date(a.date));
+              html = `<form id="trip-calculator-form" class="space-y-4 p-4 border border-gray-700 rounded-lg mb-6">
+                <h3 class="text-lg font-bold">Calculadora de Rota e Custo ${GOOGLE_MAPS_API_KEY ? '(com pedágios via Google)' : ''}</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div><label class="block text-sm text-gray-300">Origem</label><input type="text" id="trip-origin" class="form-input w-full" placeholder="Endereço completo"></div>
+                  <div><label class="block text-sm text-gray-300">Destino</label><input type="text" id="trip-destination" class="form-input w-full" placeholder="Endereço completo"></div>
+                  <div class="sm:col-span-2"><label class="block text-sm text-gray-300">Preço do Combustível (R$/L)</label><input type="number" id="trip-fuel-price" step="0.01" class="form-input w-full"></div>
+                </div>
+                <div class="text-right"><button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Calcular</button></div>
+                <p class="text-xs text-gray-400">Para pedágios, configure a meta <code>google-maps-key</code> ou <code>window.GOOGLE_MAPS_API_KEY</code>.</p>
+              </form>
+              <div id="trip-result" class="mb-6 hidden"></div>
+
+              <form id="trip-log-form" class="space-y-4 p-4 border border-gray-700 rounded-lg mb-6">
+                <h3 class="text-lg font-bold">Registro Manual de Viagens</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><label class="block text-sm text-gray-300">Data</label><input type="date" id="trip-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
+                  <div class="sm:col-span-2"><label class="block text-sm text-gray-300">Descrição</label><input type="text" id="trip-desc" class="form-input w-full" placeholder="Ex.: Viagem a trabalho"></div>
+                  <div><label class="block text-sm text-gray-300">Distância (km)</label><input type="number" id="trip-dist" class="form-input w-full"></div>
+                </div>
+                <div class="text-right"><button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Adicionar</button></div>
+              </form>
+
+              <h3 class="text-lg font-bold mb-3">Histórico de Viagens</h3>
+              <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
+                ${sortedTrips.map(t => `<div class="bg-gray-900 p-3 rounded-lg flex justify-between items-center text-sm">
+                  <div><p class="font-semibold">${t.description}</p><p class="text-gray-400">${new Date(t.date).toLocaleDateString('pt-BR')}</p></div>
+                  <p class="font-semibold">${t.distance.toLocaleString('pt-BR')} km</p>
+                </div>`).join('') || '<p class="text-gray-400 text-center p-4">Nenhuma viagem registrada.</p>'}
+              </div>`;
+              break;
+            }
+            case 'maintenance': {
+              html = `<form id="maint-log-form" class="space-y-4 p-4 border border-gray-700 rounded-lg mb-6">
+                <h3 class="text-lg font-bold">Agendar Nova Manutenção</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div class="sm:col-span-2"><label class="block text-sm text-gray-300">Item</label><input type="text" id="maint-item" class="form-input w-full" placeholder="Troca de Pneus"></div>
+                  <div><label class="block text-sm text-gray-300">Intervalo (km)</label><input type="number" id="maint-interval" class="form-input w-full" placeholder="40000"></div>
+                </div>
+                <div class="text-right"><button type="submit" class="bg-brand hover:bg-indigo-600 text-white font-bold py-2 px-5 rounded-lg">Agendar</button></div>
+              </form>
+              <h3 class="text-lg font-bold mb-3">Manutenções Agendadas</h3>
+              <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
+                ${(vehicleData.maintenanceHistory||[]).map(m => `<div class="bg-gray-900 p-3 rounded-lg text-sm">
+                  <div class="flex justify-between items-start">
+                    <div><p class="font-semibold">${m.item}</p><p class="text-gray-400">Último serviço em ${m.lastServiceKm.toLocaleString('pt-BR')} km</p></div>
+                    <div class="flex gap-2">
+                      <button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="${m.id}">✔</button>
+                      <button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="${m.id}">✖</button>
+                    </div>
+                  </div>
+                </div>`).join('') || '<p class="text-gray-400 text-center p-4">Nenhuma manutenção agendada.</p>'}
+              </div>`;
+              break;
+            }
+          }
+          contentEl.innerHTML = html;
+        };
+
+        const formatDuration = (sec) => {
+          const h = Math.floor(sec / 3600);
+          const m = Math.floor((sec % 3600) / 60);
+          return (h>0? h+'h ':'') + (m>0? m+'min':'');
+        };
+
+        async function geocodeGoogle(address) {
+          const url = \`https://maps.googleapis.com/maps/api/geocode/json?address=\${encodeURIComponent(address)}&key=\${GOOGLE_MAPS_API_KEY}\`;
+          const r = await fetch(url); const j = await r.json();
+          if (!j.results || !j.results[0]) throw new Error('Endereço não encontrado: '+address);
+          const loc = j.results[0].geometry.location;
+          return { lat: loc.lat, lng: loc.lng };
+        }
+        function sumGoogleMoney(arr) {
+          let total = 0;
+          for (const p of (arr || [])) {
+            const units = Number(p.units || 0);
+            const nanos = Number(p.nanos || 0);
+            total += units + nanos/1e9;
+          }
+          return total;
+        }
+        async function computeRoutesGoogle(origin, destination, fuelPrice) {
+          const o = await geocodeGoogle(origin);
+          const d = await geocodeGoogle(destination);
+          const body = {
+            origin: { location: { latLng: { latitude: o.lat, longitude: o.lng } } },
+            destination: { location: { latLng: { latitude: d.lat, longitude: d.lng } } },
+            travelMode: 'DRIVE',
+            routingPreference: 'TRAFFIC_AWARE',
+            computeAlternativeRoutes: true,
+            units: 'METRIC',
+            requestedReferenceRoutes: [],
+            extraComputations: ['TOLLS']
+          };
+          const resp = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+              'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.travelAdvisory.tollInfo.estimatedPrice'
+            },
+            body: JSON.stringify(body)
+          });
+          const data = await resp.json();
+          if (!data.routes || data.routes.length === 0) throw new Error('Nenhuma rota encontrada.');
+          const consumption = calculateAverageConsumption();
+          if (consumption <= 0) throw new Error('Registre pelo menos 2 abastecimentos para calcular o consumo médio.');
+          const routes = data.routes.map((r, idx) => {
+            const distanceKm = (r.distanceMeters || 0) / 1000;
+            const durationSec = parseInt((r.duration || '0s').replace('s','')) || 0;
+            const fuelCost = (distanceKm / consumption) * fuelPrice;
+            const tollCost = sumGoogleMoney(r.travelAdvisory?.tollInfo?.estimatedPrice || []);
+            const total = fuelCost + tollCost;
+            return { idx, distanceKm, durationSec, fuelCost, tollCost, total };
+          }).sort((a,b)=> a.total - b.total);
+          return routes;
+        }
+        async function calculateTripDetails(origin, destination, fuelPrice) {
+          const resultDiv = document.getElementById('trip-result');
+          resultDiv.classList.remove('hidden');
+          resultDiv.innerHTML = `<p class="text-center p-4">Calculando...</p>`;
+          try {
+            if (!GOOGLE_MAPS_API_KEY) throw new Error('Configure sua GOOGLE_MAPS_API_KEY para calcular pedágios.');
+            const routes = await computeRoutesGoogle(origin, destination, fuelPrice);
+            resultDiv.innerHTML = `
+              <div class="p-4 rounded-lg bg-gray-900 border border-gray-700 space-y-3">
+                <h5 class="font-bold text-lg">Rotas encontradas (Google)</h5>
+                ${routes.map((r,i)=>`
+                  <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 rounded-lg ${i===0?'bg-gray-800':''}">
+                    <div class="flex gap-4">
+                      <div><p class="text-xs text-gray-400">Distância</p><p class="font-semibold">${r.distanceKm.toFixed(1)} km</p></div>
+                      <div><p class="text-xs text-gray-400">Duração</p><p class="font-semibold">${formatDuration(r.durationSec)}</p></div>
+                      <div><p class="text-xs text-gray-400">Combustível</p><p class="font-semibold">${formatCurrency(r.fuelCost)}</p></div>
+                      <div><p class="text-xs text-gray-400">Pedágios</p><p class="font-semibold">${formatCurrency(r.tollCost)}</p></div>
+                      <div><p class="text-xs text-gray-400">Total</p><p class="font-bold text-brand">${formatCurrency(r.total)}</p></div>
+                    </div>
+                    <button class="add-route-expense bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-sm"
+                            data-value="${r.total.toFixed(2)}"
+                            data-desc="Viagem (rota ${i+1}) ${origin} → ${destination}">
+                      Lançar como Despesa
+                    </button>
+                  </div>
+                `).join('')}
+              </div>`;
+          } catch (error) {
+            console.error(error);
+            resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
+            showToast('Erro ao calcular a rota.','error');
+          }
+        }
+
+        DOM.carModuleBtn.addEventListener('click', showCarModal);
+        DOM.carModalContainer.addEventListener('click', async e => {
+          if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
+          if (e.target.closest('.tab-btn')) {
+            const tabBtn = e.target.closest('.tab-btn');
+            document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+            tabBtn.classList.add('active');
+            renderCarTab(tabBtn.dataset.tab);
+          }
+          if (e.target.classList.contains('add-route-expense')) {
+            const value = parseFloat(e.target.dataset.value);
+            const description = e.target.dataset.desc;
+            hideCarModal();
+            showExpenseModal({ category: 'Carro', description, value });
+          }
+          if (e.target.closest('.maint-done-btn')) {
+            const id = e.target.closest('.maint-done-btn').dataset.id;
+            const latestOdometer = getLatestOdometer();
+            const newOdometer = prompt('Serviço realizado! Qual o KM atual do veículo?', latestOdometer);
+            if (newOdometer && !isNaN(newOdometer)) {
+              const idx = vehicleData.maintenanceHistory.findIndex(m => String(m.id) === String(id));
+              vehicleData.maintenanceHistory[idx].lastServiceKm = parseInt(newOdometer);
+              await saveAppState(); renderCarTab('maintenance'); showToast('Manutenção registrada!');
+            }
+          }
+          if (e.target.closest('.maint-delete-btn')) {
+            const id = e.target.closest('.maint-delete-btn').dataset.id;
+            if (confirm('Tem certeza que deseja excluir este agendamento?')) {
+              vehicleData.maintenanceHistory = vehicleData.maintenanceHistory.filter(m => String(m.id) !== String(id));
+              await saveAppState(); renderCarTab('maintenance'); showToast('Agendamento excluído.');
+            }
+          }
+        });
+
+        DOM.carModalContainer.addEventListener('submit', async e => {
+          e.preventDefault();
+          switch (e.target.id) {
+            case 'car-profile-form':
+              vehicleData.profile = {
+                model: document.getElementById('car-model').value,
+                plate: document.getElementById('car-plate').value,
+                oilChangeKmInterval: parseInt(document.getElementById('car-oil-interval').value) || 10000,
+                lastOilChangeKm: parseInt(document.getElementById('car-last-oil').value) || 0
+              };
+              await saveAppState(); showToast('Perfil salvo com sucesso!');
+              break;
+            case 'fuel-log-form':
+              const f = {
+                id: Date.now(),
+                date: document.getElementById('fuel-date').value,
+                odometer: parseInt(document.getElementById('fuel-odometer').value),
+                liters: parseFloat(document.getElementById('fuel-liters').value),
+                totalValue: parseFloat(document.getElementById('fuel-total-value').value)
+              };
+              if (!f.odometer || !f.liters || !f.totalValue) { showToast('Preencha todos os campos.','error'); return; }
+              vehicleData.fuelHistory.push(f); await saveAppState(); showToast('Abastecimento registrado!');
+              e.target.reset(); document.getElementById('fuel-date').value = toISODateString(new Date()); renderCarTab('fuel'); break;
+            case 'trip-log-form':
+              const t = {
+                id: Date.now(),
+                date: document.getElementById('trip-date').value,
+                description: document.getElementById('trip-desc').value,
+                distance: parseInt(document.getElementById('trip-dist').value)
+              };
+              if (!t.description || !t.distance) { showToast('Preencha todos os campos.','error'); return; }
+              vehicleData.tripHistory.push(t); await saveAppState(); showToast('Viagem registrada!');
+              e.target.reset(); document.getElementById('trip-date').value = toISODateString(new Date()); renderCarTab('trips'); break;
+            case 'maint-log-form':
+              const m = {
+                id: Date.now(),
+                item: document.getElementById('maint-item').value,
+                kmInterval: parseInt(document.getElementById('maint-interval').value),
+                lastServiceKm: getLatestOdometer()
+              };
+              if (!m.item || !m.kmInterval) { showToast('Preencha todos os campos.','error'); return; }
+              vehicleData.maintenanceHistory.push(m); await saveAppState(); showToast('Manutenção agendada!');
+              e.target.reset(); renderCarTab('maintenance'); break;
+            case 'trip-calculator-form':
+              const origin = document.getElementById('trip-origin').value;
+              const destination = document.getElementById('trip-destination').value;
+              const fuelPrice = parseFloat(document.getElementById('trip-fuel-price').value);
+              if (!origin || !destination || !fuelPrice) { showToast('Preencha Origem, Destino e Preço do Combustível.','error'); return; }
+              await calculateTripDetails(origin, destination, fuelPrice);
+              break;
+          }
+        });
+
+        // ====== CARGA INICIAL ======
+        const initial = await getAppState();
+        if (initial) {
+          expensesData = Array.isArray(initial.expensesData) ? initial.expensesData : [];
+          incomeData = initial.incomeData || {};
+          vehicleData = initial.vehicleData || { profile:{}, fuelHistory:[], tripHistory:[], maintenanceHistory:[] };
+        }
+        renderMonthView();
+      })();
+    });
+  </script>
 </body>
 </html>
-
