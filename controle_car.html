@@ -857,7 +857,7 @@
                 return str.trim() || '0min';
             };
 
-            const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
+           const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
                 if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY === 'SUA_CHAVE_API_DA_TOLLGURU_AQUI') {
                     showToast('Chave da API TollGuru não configurada.', 'error'); return;
                 }
@@ -870,17 +870,19 @@
                 resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
                 try {
-                    // Normaliza o formato dos endereços antes de enviar para a API
-                    const formattedOrigin = origin.replace(/--/g, ', ');
-                    const formattedDestination = destination.replace(/--/g, ', ');
-                    
-                    // ================================================================
-                    // PASSO DE VERIFICAÇÃO: Ver no console o que será enviado
-                    console.log("Enviando para a API TollGuru:", { 
-                        origin: formattedOrigin, 
-                        destination: formattedDestination 
+                    // ===================================================================================
+                    // LÓGICA FINAL E CORRETA:
+                    // Troca '--' por ',' e adiciona 'Brazil' para dar contexto ao país, sem assumir o estado.
+                    // Ex: 'São Paulo--SP' vira 'São Paulo, SP, Brazil'
+                    // Ex: 'Rio de Janeiro--RJ' vira 'Rio de Janeiro, RJ, Brazil'
+                    const finalOrigin = `${origin.replace(/--/g, ', ')}, Brazil`;
+                    const finalDestination = `${destination.replace(/--/g, ', ')}, Brazil`;
+                    // ===================================================================================
+
+                    console.log("Enviando endereço final para a API:", { 
+                        origin: finalOrigin, 
+                        destination: finalDestination 
                     });
-                    // ================================================================
 
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
                     const response = await fetch(apiUrl, {
@@ -890,16 +892,15 @@
                             'x-api-key': TOLLGURU_API_KEY
                         },
                         body: JSON.stringify({
-                            // Usa as variáveis formatadas
-                            from: { address: formattedOrigin },
-                            to: { address: formattedDestination },
+                            from: { address: finalOrigin },
+                            to: { address: finalDestination },
                             vehicle: {
                                 type: vehicleType,
                                 fuelPrice: fuelPrice,
                                 fuelPriceCurrency: "BRL",
                                 fuelEfficiency: {
                                     city: consumption,
-                                    hwy: consumption, // Usamos o mesmo para simplificar
+                                    hwy: consumption,
                                     units: "km/L"
                                 }
                             }
@@ -1049,9 +1050,20 @@
                         const origin = document.getElementById('trip-origin').value;
                         const destination = document.getElementById('trip-destination').value;
                         const fuelPrice = parseFloat(document.getElementById('trip-fuel-price').value);
-                        const vehicleType = document.getElementById('trip-vehicle-type').value; // Pega o novo valor
-                        if (!origin || !destination || !fuelPrice) { showToast('Preencha todos os campos da rota.', 'error'); return; }
-                        // Chama a nova função com o parâmetro extra
+                        const vehicleType = document.getElementById('trip-vehicle-type').value;
+
+                        // =================================================================
+                        // VALIDAÇÃO CORRIGIDA: Verifica se origem e destino não estão vazios
+                        if (!origin.trim() || !destination.trim()) {
+                            showToast('Por favor, preencha os campos de Origem e Destino.', 'error');
+                            return; // Impede a chamada da API se os campos estiverem vazios
+                        }
+                        if (!fuelPrice) {
+                            showToast('Por favor, preencha o preço do combustível.', 'error');
+                            return;
+                        }
+                        // =================================================================
+
                         await calculateTripWithTolls(origin, destination, fuelPrice, vehicleType);
                         break;
                     }
@@ -1073,6 +1085,7 @@
     </script>
 </body>
 </html>
+
 
 
 
