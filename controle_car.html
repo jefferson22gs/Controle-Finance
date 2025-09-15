@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Painel Financeiro - Casal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --primary-color: #6366f1;
+      --background-color: #111827;
+      --card-background-color: #1f2937;
+      --text-color-primary: #f9fafb;
+      --text-color-secondary: #9ca3af;
+      --border-color: #374151;
+    }
+    body {
+      font-family: "Poppins", sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color-primary);
+    }
+    h1,
+    h2,
+    h3 {
+      font-family: "Inter", sans-serif;
+      font-weight: 700;
+    }
+    .card {
+      background-color: var(--card-background-color);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8 flex flex-col">
+  <script src="supabaseClient.js"></script>
+  <script>
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (!data.session) window.location.href = "index.html";
+    });
+  </script>
+
+  <div class="max-w-6xl mx-auto w-full space-y-8">
+    <header class="text-center">
+      <h1 class="text-4xl font-bold">Painel Financeiro</h1>
+      <p class="text-text-secondary">Resumo financeiro e veículo</p>
+    </header>
+
+    <!-- ================= FINANCEIRO ================= -->
+    <section>
+      <h2 class="text-2xl mb-4">Financeiro</h2>
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="card">
+          <label>Renda 1 (R$)</label>
+          <input id="salary1" type="number" step="0.01" class="form-input w-full rounded-md p-2 bg-gray-800" />
+        </div>
+        <div class="card">
+          <label>Renda 2 (R$)</label>
+          <input id="salary2" type="number" step="0.01" class="form-input w-full rounded-md p-2 bg-gray-800" />
+        </div>
+      </div>
+      <div id="summary-section" class="space-y-2 mb-4"></div>
+      <canvas id="expensesChart"></canvas>
+      <button id="add-expense-btn" class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded">Adicionar Despesa</button>
+      <div id="expenses-list" class="space-y-2 mt-4"></div>
+    </section>
+
+    <!-- ================= VEÍCULO ================= -->
+    <section>
+      <h2 class="text-2xl mb-4">Veículo</h2>
+
+      <div class="card mb-4">
+        <h3 class="text-lg font-semibold">Perfil</h3>
+        <input id="car-model" placeholder="Modelo" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="car-plate" placeholder="Placa" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="car-oil-interval" type="number" placeholder="Intervalo óleo (km)" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="car-last-oil" type="number" placeholder="Última troca óleo (km)" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <button id="save-car-profile" class="mt-2 bg-green-600 px-4 py-2 rounded">Salvar Perfil</button>
+      </div>
+
+      <div class="card mb-4">
+        <h3 class="text-lg font-semibold">Abastecimentos</h3>
+        <input id="fuel-date" type="date" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="fuel-odometer" type="number" placeholder="Odômetro" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="fuel-liters" type="number" placeholder="Litros" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="fuel-total" type="number" placeholder="Valor (R$)" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <button id="add-fuel" class="mt-2 bg-indigo-600 px-4 py-2 rounded">Registrar Abastecimento</button>
+        <div id="fuel-list" class="mt-4 space-y-2"></div>
+      </div>
+
+      <div class="card mb-4">
+        <h3 class="text-lg font-semibold">Viagens</h3>
+        <input id="trip-date" type="date" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="trip-desc" placeholder="Descrição" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="trip-dist" type="number" placeholder="Distância (km)" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <button id="add-trip" class="mt-2 bg-indigo-600 px-4 py-2 rounded">Registrar Viagem</button>
+        <div id="trip-list" class="mt-4 space-y-2"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="text-lg font-semibold">Manutenções</h3>
+        <input id="maint-item" placeholder="Item" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <input id="maint-interval" type="number" placeholder="Intervalo (km)" class="block w-full p-2 mt-1 bg-gray-800 rounded" />
+        <button id="add-maint" class="mt-2 bg-indigo-600 px-4 py-2 rounded">Agendar</button>
+        <div id="maint-list" class="mt-4 space-y-2"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user) return;
+
+      // ====== VARS ======
+      const monthKey = new Date().toISOString().slice(0, 7);
+      let expenses = [];
+      let incomes = {};
+      let fuels = [];
+      let trips = [];
+      let maints = [];
+      let carProfile = {};
+
+      // ====== FINANCEIRO ======
+      async function loadFinance() {
+        const { data: exp } = await supabaseClient.from("expenses").select("*").eq("user_id", user.id).order("date", { ascending: false });
+        expenses = exp || [];
+
+        const { data: inc } = await supabaseClient.from("incomes").select("*").eq("user_id", user.id);
+        incomes = {};
+        inc?.forEach(i => incomes[i.month_key] = { salary1: i.salary1, salary2: i.salary2 });
+
+        renderFinance();
+      }
+
+      async function saveIncome(s1, s2) {
+        await supabaseClient.from("incomes").upsert({ user_id: user.id, month_key: monthKey, salary1: s1, salary2: s2 });
+      }
+
+      async function addExpense(desc, val, cat) {
+        await supabaseClient.from("expenses").insert({ user_id: user.id, date: new Date().toISOString().slice(0, 10), description: desc, value: val, category: cat });
+        loadFinance();
+      }
+
+      function renderFinance() {
+        const salary1 = incomes[monthKey]?.salary1 || 0;
+        const salary2 = incomes[monthKey]?.salary2 || 0;
+        document.getElementById("salary1").value = salary1;
+        document.getElementById("salary2").value = salary2;
+
+        const monthExpenses = expenses.filter(e => e.date.startsWith(monthKey));
+        const totalExpenses = monthExpenses.reduce((s, e) => s + e.value, 0);
+        const totalIncome = (parseFloat(salary1) || 0) + (parseFloat(salary2) || 0);
+        const balance = totalIncome - totalExpenses;
+
+        document.getElementById("summary-section").innerHTML = `
+          <div>Renda: R$ ${totalIncome}</div>
+          <div>Saídas: R$ ${totalExpenses}</div>
+          <div>Saldo: <span class="${balance>=0?"text-green-400":"text-red-400"}">R$ ${balance}</span></div>
+        `;
+
+        document.getElementById("expenses-list").innerHTML = monthExpenses.map(e => `<div class="p-2 bg-gray-800 rounded">${e.description} - R$ ${e.value}</div>`).join("");
+      }
+
+      // ====== VEÍCULO ======
+      async function loadVehicle() {
+        const { data: profile } = await supabaseClient.from("vehicle_profiles").select("*").eq("user_id", user.id).single();
+        carProfile = profile || {};
+
+        const { data: f } = await supabaseClient.from("fuel_logs").select("*").eq("user_id", user.id).order("date", { ascending: false });
+        fuels = f || [];
+
+        const { data: t } = await supabaseClient.from("trips").select("*").eq("user_id", user.id).order("date", { ascending: false });
+        trips = t || [];
+
+        const { data: m } = await supabaseClient.from("maintenances").select("*").eq("user_id", user.id);
+        maints = m || [];
+
+        renderVehicle();
+      }
+
+      async function saveCarProfile() {
+        carProfile = {
+          user_id: user.id,
+          model: document.getElementById("car-model").value,
+          plate: document.getElementById("car-plate").value,
+          oil_change_km_interval: parseInt(document.getElementById("car-oil-interval").value) || 10000,
+          last_oil_change_km: parseInt(document.getElementById("car-last-oil").value) || 0,
+        };
+        await supabaseClient.from("vehicle_profiles").upsert(carProfile);
+        loadVehicle();
+      }
+
+      async function addFuel() {
+        await supabaseClient.from("fuel_logs").insert({
+          user_id: user.id,
+          date: document.getElementById("fuel-date").value,
+          odometer: parseInt(document.getElementById("fuel-odometer").value),
+          liters: parseFloat(document.getElementById("fuel-liters").value),
+          total_value: parseFloat(document.getElementById("fuel-total").value),
+        });
+        loadVehicle();
+      }
+
+      async function addTrip() {
+        await supabaseClient.from("trips").insert({
+          user_id: user.id,
+          date: document.getElementById("trip-date").value,
+          description: document.getElementById("trip-desc").value,
+          distance: parseFloat(document.getElementById("trip-dist").value),
+        });
+        loadVehicle();
+      }
+
+      async function addMaint() {
+        await supabaseClient.from("maintenances").insert({
+          user_id: user.id,
+          item: document.getElementById("maint-item").value,
+          km_interval: parseInt(document.getElementById("maint-interval").value),
+          last_service_km: 0,
+        });
+        loadVehicle();
+      }
+
+      function renderVehicle() {
+        document.getElementById("car-model").value = carProfile?.model || "";
+        document.getElementById("car-plate").value = carProfile?.plate || "";
+        document.getElementById("car-oil-interval").value = carProfile?.oil_change_km_interval || "";
+        document.getElementById("car-last-oil").value = carProfile?.last_oil_change_km || "";
+
+        document.getElementById("fuel-list").innerHTML = fuels.map(f => `<div class="p-2 bg-gray-800 rounded">${f.date} - ${f.odometer} km - ${f.liters}L - R$ ${f.total_value}</div>`).join("");
+        document.getElementById("trip-list").innerHTML = trips.map(t => `<div class="p-2 bg-gray-800 rounded">${t.date} - ${t.description} - ${t.distance} km</div>`).join("");
+        document.getElementById("maint-list").innerHTML = maints.map(m => `<div class="p-2 bg-gray-800 rounded">${m.item} - intervalo ${m.km_interval} km</div>`).join("");
+      }
+
+      // ====== EVENTOS ======
+      document.getElementById("salary1").addEventListener("change", e => saveIncome(e.target.value, document.getElementById("salary2").value));
+      document.getElementById("salary2").addEventListener("change", e => saveIncome(document.getElementById("salary1").value, e.target.value));
+      document.getElementById("add-expense-btn").addEventListener("click", () => addExpense("Nova Despesa", 0, "Outros"));
+
+      document.getElementById("save-car-profile").addEventListener("click", saveCarProfile);
+      document.getElementById("add-fuel").addEventListener("click", addFuel);
+      document.getElementById("add-trip").addEventListener("click", addTrip);
+      document.getElementById("add-maint").addEventListener("click", addMaint);
+
+      // ====== LOAD ======
+      loadFinance();
+      loadVehicle();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recuperar Senha</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style> body { background-color: #111827; } </style>
+</head>
+<body class="flex items-center justify-center h-screen p-4">
+    <div class="w-full max-w-md p-8 space-y-6 bg-[#1f2937] rounded-xl shadow-lg border border-[#374151]">
+        <div>
+            <h2 class="mt-6 text-center text-3xl font-extrabold text-white">Recuperar Senha</h2>
+            <p class="mt-2 text-center text-sm text-gray-400">Digite seu e-mail e enviaremos um link para criar uma nova senha.</p>
+        </div>
+        <form id="reset-form" class="mt-8 space-y-6">
+            <div><input id="email-input" name="email" type="email" required class="appearance-none relative block w-full px-3 py-2 border border-[#374151] bg-[#111827] text-white placeholder-gray-500 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" placeholder="Seu e-mail de cadastro"></div>
+            <div><button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Enviar Link</button></div>
+            <div id="message-div" class="text-center text-sm text-green-400 pt-2 h-4"></div>
+            <div class="text-center text-sm">
+                <p class="text-gray-400">Lembrou a senha? <a href="index.html" class="font-medium text-indigo-400 hover:text-indigo-300">Faça login</a></p>
+            </div>
+        </form>
+    </div>
+    <script src="supabaseClient.js"></script>
+    <script>
+        const resetForm = document.getElementById('reset-form');
+        const messageDiv = document.getElementById('message-div');
+        resetForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            messageDiv.textContent = '';
+            const email = document.getElementById('email-input').value;
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { ... });
+                redirectTo: window.location.origin + "/index.html"
+            });
+            if (error) {
+                messageDiv.textContent = 'Erro: ' + error.message;
+                messageDiv.className = "text-center text-sm text-red-400 pt-2 h-4";
+            } else {
+                messageDiv.textContent = 'Link de recuperação enviado para o seu e-mail!';
+                messageDiv.className = "text-center text-sm text-green-400 pt-2 h-4";
+            }
+        });
+    </script>
+</body>
+</html>
