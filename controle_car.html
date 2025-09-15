@@ -858,33 +858,34 @@
             };
 
             const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-                // Validações iniciais
+                // Validações iniciais (Chaves, Consumo, etc.)
                 if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY.includes('SUA_CHAVE')) {
                     showToast('Chave da API TollGuru não configurada.', 'error'); return;
                 }
                 if (!MAPBOX_ACCESS_TOKEN || MAPBOX_ACCESS_TOKEN.includes('SEU_ACCESS_TOKEN')) {
                     showToast('Access Token do Mapbox não configurado.', 'error'); return;
                 }
-                
-                // NOTA: A validação de consumo foi temporariamente removida para este teste.
-                // const consumption = calculateAverageConsumption();
-                // if (consumption <= 0) {
-                //     showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
-                // }
+                const consumption = calculateAverageConsumption();
+                if (consumption <= 0) {
+                    showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
+                }
                 
                 const resultDiv = document.getElementById('trip-result');
                 resultDiv.classList.remove('hidden');
                 resultDiv.innerHTML = `<p class="text-center p-4">Geocodificando endereços...</p>`;
 
+                // Etapa 1: Converter endereços para coordenadas usando Mapbox
                 const getCoords = async (address) => {
                     const formattedAddress = address.replace(/--/g, ', ');
                     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedAddress)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1&country=BR`;
+                    
                     const response = await fetch(url);
                     const data = await response.json();
+                    
                     if (!data.features || data.features.length === 0) {
                         throw new Error(`Endereço não encontrado: ${address}`);
                     }
-                    return data.features[0].center;
+                    return data.features[0].center; 
                 };
 
                 try {
@@ -895,6 +896,7 @@
                     
                     resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
+                    // Etapa 2: Enviar coordenadas para a TollGuru
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
                     const response = await fetch(apiUrl, {
                         method: 'POST',
@@ -908,8 +910,12 @@
                             vehicle: {
                                 type: vehicleType,
                                 fuelPrice: fuelPrice,
-                                fuelPriceCurrency: "BRL"
-                                // O campo 'fuelEfficiency' FOI REMOVIDO PARA ESTE TESTE
+                                fuelPriceCurrency: "BRL",
+                                fuelEfficiency: {
+                                    city: consumption,
+                                    hwy: consumption,
+                                    units: "km/L"
+                                }
                             }
                         })
                     });
@@ -929,7 +935,6 @@
                     const distanceInKm = route.distance.value;
                     const durationText = formatDuration(route.duration.value);
                     const tollCost = route.costs.toll || 0;
-                    // O custo de combustível não será calculado corretamente neste teste
                     const fuelCost = route.costs.fuel || 0;
                     const totalCost = tollCost + fuelCost;
 
@@ -1036,6 +1041,7 @@
     </script>
 </body>
 </html>
+
 
 
 
