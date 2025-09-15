@@ -159,7 +159,7 @@
             const { data: income, error: incError } = await supabaseClient.from('income').select('*').eq('month_key', monthKey).single();
             
             if (expError) { console.error('Erro ao buscar despesas:', expError.message); showToast('Erro ao buscar despesas.', 'error'); return; }
-            if (incError) { console.error('Erro ao buscar renda:', incError.message); if(incError.code !== 'PGRST116') showToast('Erro ao buscar renda.', 'error'); } // PGRST116 = not found, normal
+            if (incError && incError.code !== 'PGRST116') { console.error('Erro ao buscar renda:', incError.message); showToast('Erro ao buscar renda.', 'error'); }
 
             expensesData = expenses || [];
             incomeData = income || { salary1: '', salary2: '' };
@@ -204,15 +204,12 @@
             const modalHTML = `
                 <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
                     <form id="expense-form-inner">
-                        <div class="flex justify-between items-center p-5 border-b border-border-color">
-                            <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
-                            <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                        </div>
+                        <div class="flex justify-between items-center p-5 border-b border-border-color"><h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3><button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button></div>
                         <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
-                            <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
-                            <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
-                            <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
+                            <div><label class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full" required value="${date || toISODateString(currentDate)}"></div>
+                            <div><label class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full" required>${categoryOptions}</select></div>
+                            <div class="sm:col-span-2"><label class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full" required value="${description || ''}"></div>
+                            <div class="sm:col-span-2"><label class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full" required value="${value || ''}"></div>
                         </div>
                         <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
                             ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
@@ -222,35 +219,21 @@
                 </div>`;
             
             DOM.modalContainer.innerHTML = modalHTML;
-            DOM.mainContainer.classList.add('modal-open');
-            DOM.modalContainer.classList.add('visible');
-            DOM.body.classList.add('modal-open-body');
+            DOM.mainContainer.classList.add('modal-open'); DOM.modalContainer.classList.add('visible'); DOM.body.classList.add('modal-open-body');
             setTimeout(() => document.getElementById('form-description').focus(), 50);
         };
         
         const hideExpenseModal = () => {
-            DOM.mainContainer.classList.remove('modal-open');
-            DOM.modalContainer.classList.remove('visible');
-            DOM.body.classList.remove('modal-open-body');
+            DOM.mainContainer.classList.remove('modal-open'); DOM.modalContainer.classList.remove('visible'); DOM.body.classList.remove('modal-open-body');
             setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
         };
 
         const handleSalaryChange = async () => { 
             const monthKey = getMonthYearKey(currentDate);
-            const newIncome = {
-                month_key: monthKey,
-                salary1: DOM.salary1Input.value || null,
-                salary2: DOM.salary2Input.value || null
-            };
-
+            const newIncome = { month_key: monthKey, salary1: DOM.salary1Input.value || null, salary2: DOM.salary2Input.value || null };
             const { error } = await supabaseClient.from('income').upsert(newIncome, { onConflict: 'month_key' });
-            if (error) {
-                console.error("Erro ao salvar renda:", error);
-                showToast('Erro ao salvar renda.', 'error');
-            } else {
-                incomeData = newIncome;
-                renderSummary();
-            }
+            if (error) { console.error("Erro ao salvar renda:", error); showToast('Erro ao salvar renda.', 'error'); } 
+            else { incomeData = newIncome; renderSummary(); }
         };
         
         DOM.salary1Input.addEventListener('change', handleSalaryChange); 
@@ -260,10 +243,7 @@
         DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
         DOM.expensesList.addEventListener('click', (e) => { 
             const card = e.target.closest('.expense-card'); 
-            if (card) {
-                const expense = expensesData.find(exp => exp.id === parseInt(card.dataset.id));
-                if(expense) showExpenseModal(expense);
-            }
+            if (card) { const expense = expensesData.find(exp => exp.id === parseInt(card.dataset.id)); if(expense) showExpenseModal(expense); }
         });
 
         DOM.modalContainer.addEventListener('click', async (e) => { 
@@ -271,7 +251,7 @@
             if (e.target.id === 'delete-btn' && currentEditingId) { 
                 if(confirm('Tem certeza que deseja excluir este lançamento?')) {
                     const { error } = await supabaseClient.from('expenses').delete().eq('id', currentEditingId);
-                    if(error) { showToast('Erro ao excluir lançamento.', 'error'); console.error(error); } 
+                    if(error) { showToast('Erro ao excluir.', 'error'); console.error(error); } 
                     else { await renderMonthView(); hideExpenseModal(); showToast('Lançamento excluído!', 'success'); }
                 } 
             } 
@@ -282,157 +262,130 @@
                 e.preventDefault(); 
                 const formDate = document.getElementById('form-date').value;
                 const expenseObject = { 
-                    date: formDate, month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')),
-                    description: document.getElementById('form-description').value, category: document.getElementById('form-category').value,
-                    value: parseFloat(document.getElementById('form-value').value) || 0
+                    date: formDate, month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')), description: document.getElementById('form-description').value,
+                    category: document.getElementById('form-category').value, value: parseFloat(document.getElementById('form-value').value) || 0
                 }; 
-
-                let result;
-                if (currentEditingId) { result = await supabaseClient.from('expenses').update(expenseObject).eq('id', currentEditingId); } 
-                else { result = await supabaseClient.from('expenses').insert(expenseObject); }
-                
-                if (result.error) { showToast('Erro ao salvar lançamento.', 'error'); console.error(result.error); } 
-                else { await renderMonthView(); hideExpenseModal(); showToast('Lançamento salvo com sucesso!', 'success'); }
+                const { error } = currentEditingId ? await supabaseClient.from('expenses').update(expenseObject).eq('id', currentEditingId) : await supabaseClient.from('expenses').insert(expenseObject);
+                if (error) { showToast('Erro ao salvar.', 'error'); console.error(error); } 
+                else { await renderMonthView(); hideExpenseModal(); showToast('Salvo com sucesso!', 'success'); }
             } 
         });
 
         // =================================================================================
-        // INÍCIO DO MÓDULO DE VEÍCULO INTEGRADO COM SUPABASE
+        // MÓDULO DE VEÍCULO INTEGRADO COM SUPABASE
         // =================================================================================
         const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
-        let vehicleData = {}; // Objeto para guardar os dados do veículo carregados
+        let vehicleData = {};
 
         const loadVehicleData = async () => {
             try {
-                const { data: profile, error: pError } = await supabaseClient.from('vehicle_profile').select('*').single();
-                const { data: fuel, error: fError } = await supabaseClient.from('fuel_history').select('*').order('odometer', { ascending: false });
-                const { data: trips, error: tError } = await supabaseClient.from('trip_history').select('*').order('date', { ascending: false });
-                const { data: maintenance, error: mError } = await supabaseClient.from('maintenance_history').select('*').order('item');
-
-                if (pError && pError.code !== 'PGRST116') throw pError;
-                if (fError) throw fError;
-                if (tError) throw tError;
-                if (mError) throw mError;
-
+                const [profileRes, fuelRes, maintenanceRes] = await Promise.all([
+                    supabaseClient.from('vehicle_profile').select('*').limit(1).single(),
+                    supabaseClient.from('fuel_history').select('*').order('odometer', { ascending: false }),
+                    supabaseClient.from('maintenance_history').select('*').order('item')
+                ]);
+                if (profileRes.error && profileRes.error.code !== 'PGRST116') throw profileRes.error;
+                if (fuelRes.error) throw fuelRes.error;
+                if (maintenanceRes.error) throw maintenanceRes.error;
                 vehicleData = {
-                    profile: profile || {},
-                    fuelHistory: fuel || [],
-                    tripHistory: trips || [],
-                    maintenanceHistory: maintenance || []
-                };
-                return true;
+                    profile: profileRes.data || {}, fuelHistory: fuelRes.data || [], maintenanceHistory: maintenanceRes.data || []
+                }; return true;
             } catch (error) {
                 console.error("Erro ao carregar dados do veículo:", error);
-                showToast('Falha ao carregar dados do veículo.', 'error');
-                return false;
+                showToast('Falha ao carregar dados do veículo.', 'error'); return false;
             }
         };
 
         const showCarModal = async () => {
-            const modalHTML = `
-            <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;">
-                <div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
-                    <h3 class="text-xl font-display">Painel Inteligente do Veículo</h3>
-                    <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                </div>
-                <div class="p-4 border-b border-border-color flex-shrink-0">
-                    <div id="car-tabs" class="flex items-center gap-2 sm:gap-4 overflow-x-auto">
-                        <button class="tab-btn active" data-tab="overview">Visão Geral</button>
-                        <button class="tab-btn" data-tab="profile">Perfil</button>
-                        <button class="tab-btn" data-tab="fuel">Abastecimentos</button>
-                        <button class="tab-btn" data-tab="maintenance">Manutenções</button>
-                    </div>
-                </div>
-                <div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div>
-            </div>`;
+            const modalHTML = `<div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;"><div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0"><h3 class="text-xl font-display">Painel Inteligente do Veículo</h3><button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button></div><div class="p-4 border-b border-border-color flex-shrink-0"><div id="car-tabs" class="flex items-center gap-2 sm:gap-4 overflow-x-auto"><button class="tab-btn active" data-tab="overview">Visão Geral</button><button class="tab-btn" data-tab="profile">Perfil</button><button class="tab-btn" data-tab="fuel">Abastecimentos</button><button class="tab-btn" data-tab="maintenance">Manutenções</button></div></div><div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div></div>`;
             DOM.carModalContainer.innerHTML = modalHTML;
             document.getElementById('car-modal-content').innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`;
-            DOM.mainContainer.classList.add('modal-open');
-            DOM.carModalContainer.classList.add('visible');
-            DOM.body.classList.add('modal-open-body');
-
-            const success = await loadVehicleData();
-            if (success) {
-                renderCarTab('overview');
-            } else {
-                hideCarModal();
-            }
+            DOM.mainContainer.classList.add('modal-open'); DOM.carModalContainer.classList.add('visible'); DOM.body.classList.add('modal-open-body');
+            if (await loadVehicleData()) renderCarTab('overview'); else hideCarModal();
         };
 
         const hideCarModal = () => {
-            DOM.mainContainer.classList.remove('modal-open');
-            DOM.carModalContainer.classList.remove('visible');
-            DOM.body.classList.remove('modal-open-body');
+            DOM.mainContainer.classList.remove('modal-open'); DOM.carModalContainer.classList.remove('visible'); DOM.body.classList.remove('modal-open-body');
             setTimeout(() => { DOM.carModalContainer.innerHTML = ''; }, 300);
         };
         
-        // ... (as funções `renderCarTab`, `calculateAverageConsumption`, etc., precisam ser adaptadas para usar a variável `vehicleData` global)
-        // O código restante do módulo veicular precisa ser adaptado para usar o `vehicleData` e fazer chamadas `async` ao supabase.
-        // A lógica de `renderCarTab`, formulários, etc., permanece muito similar, mas as ações (submit) agora serão `async` e usarão `supabaseClient`.
-        
-        // Exemplo de como um formulário seria adaptado:
+        const getLatestOdometer = () => {
+            const allEntries = [...vehicleData.fuelHistory, ...vehicleData.maintenanceHistory.map(m => ({odometer: m.last_service_km}))];
+            if (allEntries.length === 0) return vehicleData.profile?.last_oil_change_km || 0;
+            return Math.max(...allEntries.map(e => e.odometer || 0), vehicleData.profile?.last_oil_change_km || 0);
+        };
+        const calculateAverageConsumption = () => {
+            if (vehicleData.fuelHistory.length < 2) return 0;
+            let totalKm = vehicleData.fuelHistory[0].odometer - vehicleData.fuelHistory[vehicleData.fuelHistory.length - 1].odometer;
+            let totalLiters = vehicleData.fuelHistory.slice(0, -1).reduce((sum, log) => sum + log.liters, 0);
+            return totalLiters > 0 ? (totalKm / totalLiters) : 0;
+        };
+
+        // ESTA É A FUNÇÃO COMPLETA QUE CRIA A INTERFACE DE CADA ABA
+        const renderCarTab = (tabId) => {
+            const contentEl = document.getElementById('car-modal-content');
+            if (!contentEl) return;
+            const latestOdometer = getLatestOdometer();
+            let html = '';
+            switch(tabId) {
+                case 'overview': {
+                    const avgConsumption = calculateAverageConsumption();
+                    const oilChangeInterval = vehicleData.profile?.oil_change_km_interval || 10000;
+                    const lastOilChangeKm = vehicleData.profile?.last_oil_change_km || 0;
+                    const kmSinceOilChange = latestOdometer - lastOilChangeKm;
+                    const oilProgress = Math.min((kmSinceOilChange / oilChangeInterval) * 100, 100);
+                    const oilKmRemaining = Math.max(0, oilChangeInterval - kmSinceOilChange);
+                    let oilProgressColor = oilProgress >= 100 ? 'bg-red-500' : oilProgress > 80 ? 'bg-yellow-500' : 'bg-indigo-500';
+                    html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">${latestOdometer.toLocaleString('pt-BR')} km</p></div><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Consumo Médio</h4><p class="text-2xl font-bold">${avgConsumption.toFixed(2)} km/L</p></div><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">${oilKmRemaining.toLocaleString('pt-BR')} km</p></div></div><div class="space-y-4"><h3 class="font-display text-lg">Alertas de Manutenção</h3><div class="bg-background-color p-4 rounded-lg"><div class="flex justify-between items-center mb-1"><span class="font-semibold">Troca de Óleo</span><span class="text-sm font-medium ${oilProgress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceOilChange.toLocaleString('pt-BR')} / ${oilChangeInterval.toLocaleString('pt-BR')} km</span></div><div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${oilProgressColor}" style="width: ${oilProgress}%"></div></div></div>${(vehicleData.maintenanceHistory || []).map(maint => { const kmSinceService = latestOdometer - maint.last_service_km; const progress = Math.min((kmSinceService / maint.km_interval) * 100, 100); const kmRemaining = Math.max(0, maint.km_interval - kmSinceService); let progressColor = progress >= 100 ? 'bg-red-500' : progress > 80 ? 'bg-yellow-500' : 'bg-indigo-500'; return `<div class="bg-background-color p-4 rounded-lg"><div class="flex justify-between items-center mb-1"><span class="font-semibold">${maint.item} <small class="text-text-secondary">(próxima em ${kmRemaining.toLocaleString('pt-BR')} km)</small></span><span class="text-sm font-medium ${progress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceService.toLocaleString('pt-BR')} / ${maint.km_interval.toLocaleString('pt-BR')} km</span></div><div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${progressColor}" style="width: ${progress}%"></div></div></div>`; }).join('')}</div>`; break;
+                }
+                case 'profile': {
+                    const p = vehicleData.profile || {};
+                    html = `<form id="car-profile-form" class="space-y-4"><h3 class="font-display text-lg">Perfil do Veículo</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-text-secondary mb-1">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="${p.model || ''}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="${p.plate || ''}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Intervalo Troca de Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="${p.oil_change_km_interval || '10000'}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Última Troca de Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="${p.last_oil_change_km || '0'}"></div></div><div class="text-right pt-2"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Salvar Perfil</button></div></form>`; break;
+                }
+                case 'fuel': {
+                     html = `<form id="fuel-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Registrar Abastecimento</h3><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="${toISODateString(new Date())}"></div><div><label class="block text-sm text-text-secondary">Odômetro</label><input type="number" id="fuel-odometer" placeholder="${latestOdometer}" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Litros (L)</label><input type="number" step="0.01" id="fuel-liters" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Valor Total (R$)</label><input type="number" step="0.01" id="fuel-total-value" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar</button></div></form><h3 class="font-display text-lg mb-3">Histórico de Abastecimentos</h3><div class="space-y-2 max-h-80 overflow-y-auto pr-2">${(vehicleData.fuelHistory || []).map((current, index, arr) => { const previous = arr[index + 1]; let efficiencyText = `<span class="text-xs text-text-secondary">-- km/L</span>`; if (previous) { const dist = current.odometer - previous.odometer; if (dist > 0 && current.liters > 0) efficiencyText = `<span class="font-semibold text-green-400">${(dist / current.liters).toFixed(2)} km/L</span>`; } return `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm"><div><p class="font-semibold">${new Date(current.date + 'T03:00:00Z').toLocaleDateString('pt-BR')}</p><p class="text-text-secondary">${current.odometer.toLocaleString('pt-BR')} km &bull; ${current.liters} L &bull; ${formatCurrency(current.total_value)}</p></div>${efficiencyText}</div>`; }).join('') || `<p class="text-text-secondary text-center p-4">Nenhum registro.</p>`}</div>`; break;
+                }
+                case 'maintenance': {
+                    html = `<form id="maint-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Agendar Nova Manutenção</h3><div class="grid grid-cols-1 sm:grid-cols-3 gap-4"><div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Item</label><input type="text" id="maint-item" placeholder="Troca de Pneus" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Intervalo (km)</label><input type="number" id="maint-interval" placeholder="40000" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Agendar</button></div></form><h3 class="font-display text-lg mb-3">Manutenções Agendadas</h3><div class="space-y-2 max-h-80 overflow-y-auto pr-2">${(vehicleData.maintenanceHistory || []).map(maint => `<div class="bg-background-color p-3 rounded-lg text-sm"><div class="flex justify-between items-start"><div><p class="font-semibold">${maint.item}</p><p class="text-text-secondary">Último serviço em ${maint.last_service_km.toLocaleString('pt-BR')} km</p></div><div class="flex gap-2"><button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="${maint.id}"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button><button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="${maint.id}"><svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button></div></div></div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma manutenção agendada.</p>`}</div>`; break;
+                }
+            }
+            contentEl.innerHTML = html;
+        };
+
+        DOM.carModuleBtn.addEventListener('click', showCarModal);
+        DOM.carModalContainer.addEventListener('click', async e => {
+            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
+            const tabBtn = e.target.closest('.tab-btn');
+            if (tabBtn) { document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active')); tabBtn.classList.add('active'); renderCarTab(tabBtn.dataset.tab); }
+            const deleteBtn = e.target.closest('.maint-delete-btn');
+            if (deleteBtn && confirm('Tem certeza?')) { const { error } = await supabaseClient.from('maintenance_history').delete().eq('id', deleteBtn.dataset.id); if(error){ showToast('Erro ao excluir.', 'error'); console.error(error); } else { showToast('Excluído.'); await loadVehicleData(); renderCarTab('maintenance'); }}
+            const doneBtn = e.target.closest('.maint-done-btn');
+            if (doneBtn) { const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, getLatestOdometer()); if (newOdometer && !isNaN(newOdometer)) { const { error } = await supabaseClient.from('maintenance_history').update({ last_service_km: parseInt(newOdometer) }).eq('id', doneBtn.dataset.id); if(error){ showToast('Erro ao registrar.', 'error'); console.error(error); } else { showToast('Manutenção registrada!'); await loadVehicleData(); renderCarTab('maintenance'); } }}
+        });
+
         DOM.carModalContainer.addEventListener('submit', async e => {
             e.preventDefault();
             const form = e.target;
-            
-            // Exemplo: Salvar Perfil
+            form.querySelector('button[type="submit"]').disabled = true;
             if (form.id === 'car-profile-form') {
-                const profileData = {
-                    id: vehicleData.profile?.id || undefined, // Inclui ID para upsert
-                    model: form.querySelector('#car-model').value,
-                    plate: form.querySelector('#car-plate').value,
-                    oil_change_km_interval: parseInt(form.querySelector('#car-oil-interval').value),
-                    last_oil_change_km: parseInt(form.querySelector('#car-last-oil').value)
-                };
-                
+                const profileData = { id: vehicleData.profile?.id || 1, model: form.querySelector('#car-model').value, plate: form.querySelector('#car-plate').value, oil_change_km_interval: parseInt(form.querySelector('#car-oil-interval').value), last_oil_change_km: parseInt(form.querySelector('#car-last-oil').value) };
                 const { error } = await supabaseClient.from('vehicle_profile').upsert(profileData);
-                if (error) { showToast('Erro ao salvar perfil.', 'error'); console.error(error); }
-                else { showToast('Perfil salvo com sucesso!'); await loadVehicleData(); renderCarTab('profile'); }
+                if (error) { showToast('Erro ao salvar perfil.', 'error'); console.error(error); } else { showToast('Perfil salvo!'); await loadVehicleData(); renderCarTab('profile'); }
             }
-
-            // Exemplo: Adicionar Abastecimento
             if (form.id === 'fuel-log-form') {
-                const fuelData = {
-                    date: form.querySelector('#fuel-date').value,
-                    odometer: parseInt(form.querySelector('#fuel-odometer').value),
-                    liters: parseFloat(form.querySelector('#fuel-liters').value),
-                    total_value: parseFloat(form.querySelector('#fuel-total-value').value)
-                };
-                
-                if (!fuelData.odometer || !fuelData.liters || !fuelData.total_value) { showToast('Preencha todos os campos.', 'error'); return; }
-
+                const fuelData = { date: form.querySelector('#fuel-date').value, odometer: parseInt(form.querySelector('#fuel-odometer').value), liters: parseFloat(form.querySelector('#fuel-liters').value), total_value: parseFloat(form.querySelector('#fuel-total-value').value) };
+                if (!fuelData.odometer||!fuelData.liters||!fuelData.total_value) { showToast('Preencha todos os campos.', 'error'); form.querySelector('button[type="submit"]').disabled = false; return; }
                 const { error } = await supabaseClient.from('fuel_history').insert(fuelData);
-                if (error) { showToast('Erro ao registrar abastecimento.', 'error'); console.error(error); }
-                else { showToast('Abastecimento registrado!'); await loadVehicleData(); renderCarTab('fuel'); }
+                if (error) { showToast('Erro ao registrar.', 'error'); console.error(error); } else { showToast('Abastecimento registrado!'); await loadVehicleData(); renderCarTab('fuel'); }
             }
-            // Adicionar lógica similar para 'maint-log-form'
-        });
-
-        DOM.carModuleBtn.addEventListener('click', showCarModal);
-        DOM.carModalContainer.addEventListener('click', e => {
-            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
-
-            if (e.target.closest('.tab-btn')) {
-                const tabBtn = e.target.closest('.tab-btn');
-                document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
-                tabBtn.classList.add('active');
-                renderCarTab(tabBtn.dataset.tab);
+            if (form.id === 'maint-log-form') {
+                const maintData = { item: form.querySelector('#maint-item').value, km_interval: parseInt(form.querySelector('#maint-interval').value), last_service_km: getLatestOdometer() };
+                if (!maintData.item || !maintData.km_interval) { showToast('Preencha todos os campos.', 'error'); form.querySelector('button[type="submit"]').disabled = false; return; }
+                const { error } = await supabaseClient.from('maintenance_history').insert(maintData);
+                if (error) { showToast('Erro ao agendar.', 'error'); console.error(error); } else { showToast('Manutenção agendada!'); await loadVehicleData(); renderCarTab('maintenance'); }
             }
-            // Lógica de exclusão e edição para manutenções aqui...
+            if(form.querySelector('button[type="submit"]')) form.querySelector('button[type="submit"]').disabled = false;
         });
-
-        function renderCarTab(tabId) {
-            // Esta função agora usa os dados do objeto `vehicleData` que foi carregado do Supabase.
-            // A lógica de renderização HTML é a mesma da versão com localStorage.
-            const contentEl = document.getElementById('car-modal-content');
-            if (!contentEl) return;
-            // O conteúdo de cada aba (overview, profile, fuel, maintenance) deve ser gerado aqui
-            // usando os dados de `vehicleData.profile`, `vehicleData.fuelHistory`, etc.
-            // O HTML gerado é idêntico ao da versão anterior.
-            let html = `Aba ${tabId} em construção na versão Supabase.`; // Placeholder
-            contentEl.innerHTML = html; // Substituir por HTML real
-        }
-
 
         // Chamada inicial
         renderMonthView();
@@ -440,6 +393,7 @@
 </script>
 </body>
 </html>
+
 
 
 
