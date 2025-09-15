@@ -83,6 +83,13 @@
         .progress-bar-inner { height: 100%; border-radius: 9999px; transition: width 0.5s ease-in-out; }
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
     </style>
+
+  <!-- PWA meta -->
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" id="pwa-manifest">
+
 </head>
 <body class="dark p-4 sm:p-6 lg:p-8 flex flex-col">
 
@@ -489,7 +496,7 @@
                     showToast('Falha ao exportar backup.', 'error');
                 }
             });
-            // ... (código existente do exportJsonBtn) ...
+			// ... (código existente do exportJsonBtn) ...
 
             // ADICIONAR ESTE BLOCO PARA EXPORTAR PDF
             DOM.exportPdfBtn.addEventListener('click', () => {
@@ -1012,7 +1019,119 @@
           })();
         });
     </script>
+
+<script>
+(function () {
+  // Create icons via canvas
+  function genIcon(size){
+    try{
+      var c=document.createElement('canvas'); c.width=c.height=size;
+      var g=c.getContext('2d');
+      var grd=g.createLinearGradient(0,0,size,size);
+      grd.addColorStop(0,'#4f46e5'); grd.addColorStop(1,'#111827'); g.fillStyle=grd;
+      g.fillRect(0,0,size,size);
+      g.fillStyle='#ffffff';
+      g.font = (size*0.42)+'px 700 Inter, Arial, sans-serif';
+      g.textAlign='center'; g.textBaseline='middle';
+      g.fillText('PF', size/2, size/2);
+      return c.toDataURL('image/png');
+    }catch(e){ return ''; }
+  }
+  var icon192 = genIcon(192);
+  var icon512 = genIcon(512);
+
+  // Build manifest as blob
+  var manifest = {
+    name: "Painel Financeiro",
+    short_name: "Financeiro",
+    start_url: "./",
+    display: "standalone",
+    background_color: "#111827",
+    theme_color: "#6366f1",
+    icons: [
+      { src: icon192, sizes:"192x192", type:"image/png" },
+      { src: icon512, sizes:"512x512", type:"image/png" }
+    ]
+  };
+  var manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  var manifestURL = URL.createObjectURL(manifestBlob);
+  var link = document.getElementById('pwa-manifest');
+  if (link) link.setAttribute('href', manifestURL);
+
+  // Create SW code as blob
+  var swCode = `
+    const CACHE_NAME = 'pf-cache-v1';
+    const PRECACHE = [
+      './',
+      location.pathname,
+      'https://cdn.tailwindcss.com',
+      'https://cdn.jsdelivr.net/npm/chart.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+    ];
+    self.addEventListener('install', event => {
+      self.skipWaiting();
+      event.waitUntil(
+        caches.open(CACHE_NAME).then(c => c.addAll(PRECACHE.map(u => new Request(u, {mode: 'no-cors'}))))
+      );
+    });
+    self.addEventListener('activate', event => {
+      event.waitUntil(
+        caches.keys().then(keys => Promise.all(keys.map(k => k !== CACHE_NAME ? caches.delete(k) : Promise.resolve())))
+        .then(() => self.clients.claim())
+      );
+    });
+    self.addEventListener('fetch', event => {
+      const req = event.request;
+      if (req.method !== 'GET') return;
+      event.respondWith(
+        caches.match(req, {ignoreVary: true, ignoreSearch: true}).then(cached => {
+          const fetchPromise = fetch(req).then(res => {
+            try { const copy = res.clone(); caches.open(CACHE_NAME).then(c => c.put(req, copy)); } catch(e){}
+            return res;
+          }).catch(() => cached || Promise.reject('offline'));
+          return cached || fetchPromise;
+        })
+      );
+    });
+  `;
+  var swBlob = new Blob([swCode], {type:'text/javascript'});
+  var swURL = URL.createObjectURL(swBlob);
+
+  // Register SW
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(swURL, {scope: './'}).catch(console.error);
+    });
+  }
+
+  // Floating install button
+  var fab = document.createElement('button');
+  fab.id = 'pwa-install-fab';
+  fab.textContent = 'Instalar';
+  fab.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:9999;background:#374151;color:#fff;border:none;border-radius:9999px;padding:10px 14px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.25);display:none;';
+  document.body.appendChild(fab);
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    fab.style.display = 'inline-flex';
+  });
+  fab.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    fab.disabled = true;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    fab.style.display = 'none';
+    fab.disabled = false;
+  });
+  window.addEventListener('appinstalled', () => { fab.style.display = 'none'; });
+})();
+</script>
+
 </body>
 </html>
-
 
