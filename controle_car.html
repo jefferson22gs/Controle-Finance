@@ -141,114 +141,74 @@
             carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
         };
         
-        // Funções Utilitárias
         const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const toISODateString = (date) => date.toISOString().split('T')[0];
         const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const showToast = (message, type = 'success') => { DOM.toast.textContent = message; DOM.toast.className = ''; DOM.toast.classList.toggle('error', type !== 'success'); DOM.toast.classList.add('show'); setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000); };
         const showLoading = (element) => { element.innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`; };
 
-        // Funções de Renderização da Tela Principal
         const renderMonthView = async () => {
             const monthKey = getMonthYearKey(currentDate);
             DOM.monthHeader.textContent = new Date(currentDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
             showLoading(DOM.expensesList);
-
-            const [expensesRes, incomeRes] = await Promise.all([
+            const [{data: expenses, error: expError}, {data: income, error: incError}] = await Promise.all([
                 supabaseClient.from('expenses').select('*').eq('month_key', monthKey).order('date', { ascending: false }),
                 supabaseClient.from('income').select('*').eq('month_key', monthKey).single()
             ]);
-
-            const { data: expenses, error: expError } = expensesRes;
-            const { data: income, error: incError } = incomeRes;
-
             if (expError) { console.error('Erro ao buscar despesas:', expError.message); showToast('Erro ao buscar despesas.', 'error'); return; }
             if (incError && incError.code !== 'PGRST116') { console.error('Erro ao buscar renda:', incError.message); showToast('Erro ao buscar renda.', 'error'); }
-            
             expensesData = expenses || []; 
             incomeData = income || { salary1: '', salary2: '' };
-            
             DOM.salary1Input.value = incomeData.salary1 || ''; 
             DOM.salary2Input.value = incomeData.salary2 || '';
-            
             renderSummary(); 
             renderExpenseList();
         };
 
-        const renderSummary = () => { /* Código omitido por brevidade, é o mesmo de antes */ };
-        const renderExpenseList = () => { /* Código omitido por brevidade, é o mesmo de antes */ };
-
-        // Funções do Modal de Despesas
-        const showExpenseModal = (expenseData = {}) => { /* Código omitido por brevidade, é o mesmo de antes */ };
-        const hideExpenseModal = () => { /* Código omitido por brevidade, é o mesmo de antes */ };
-        
-        const handleSalaryChange = async () => { 
-            const monthKey = getMonthYearKey(currentDate);
-            const newIncome = { month_key: monthKey, salary1: DOM.salary1Input.value || null, salary2: DOM.salary2Input.value || null };
-            const { error } = await supabaseClient.from('income').upsert(newIncome, { onConflict: 'month_key' });
-            if (error) { 
-                console.error("Erro ao salvar renda:", error); 
-                showToast('Erro ao salvar renda.', 'error'); 
-            } else { 
-                incomeData = newIncome; 
-                renderSummary(); 
-            }
+        const renderSummary = () => {
+            const totalExpenses = expensesData.reduce((sum, exp) => sum + (exp.value || 0), 0);
+            const totalIncome = (parseFloat(incomeData.salary1) || 0) + (parseFloat(incomeData.salary2) || 0);
+            const balance = totalIncome - totalExpenses;
+            const summaryByCategory = CATEGORIES.map(category => ({ category, total: expensesData.filter(e => e.category === category).reduce((sum, e) => sum + e.value, 0) })).filter(item => item.total > 0);
+            let balanceColor = balance >= 0 ? 'text-green-400' : 'text-red-400';
+            DOM.summarySection.innerHTML = `<div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Renda Total</span><span class="font-semibold text-lg">${formatCurrency(totalIncome)}</span></div><div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Saídas</span><span class="font-semibold text-lg text-brand">${formatCurrency(totalExpenses)}</span></div><div class="summary-card p-4 flex justify-between items-center bg-gray-700/50"><span class="font-semibold">SALDO</span><span class="font-bold text-xl ${balanceColor}">${formatCurrency(balance)}</span></div>`;
+            let categoryHTML = '';
+            if(summaryByCategory.length > 0) categoryHTML += '<h4 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider px-2">Análise de Saídas</h4>';
+            summaryByCategory.sort((a,b) => b.total - a.total).forEach(item => { categoryHTML += `<div class="summary-card p-3 flex justify-between items-center text-sm"><div class="flex items-center gap-3"><div class="w-8 h-8 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20;"><span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span></div><h4 class="font-medium">${item.category}</h4></div><p class="font-semibold">${formatCurrency(item.total)}</p></div>`; });
+            DOM.categorySummarySection.innerHTML = categoryHTML;
+            const ctx = document.getElementById('expensesChart').getContext('2d');
+            if (window.myExpensesChart) window.myExpensesChart.destroy();
+            if (expensesData.length > 0) {
+                Chart.defaults.color = '#9ca3af';
+                window.myExpensesChart = new Chart(ctx, { type: 'doughnut', data: { labels: summaryByCategory.map(i => i.category), datasets: [{ data: summaryByCategory.map(i => i.total), backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280'), hoverOffset: 8, borderWidth: 3, borderColor: '#1f2937' }] }, options: { responsive: true, cutout: '70%', plugins: { legend: { display: false }, tooltip: { bodyFont: { size: 14 } } } } });
+            } else { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
         };
         
-        // Event Listeners da Tela Principal
-        DOM.salary1Input.addEventListener('change', handleSalaryChange); 
+        const renderExpenseList = () => {
+            if (expensesData.length === 0) { DOM.expensesList.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color"><h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3><p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p></div>`; return; }
+            DOM.expensesList.innerHTML = expensesData.map(exp => `<div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}"><div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20"><span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span></div><div class="flex-grow"><p class="font-semibold">${exp.description}</p><p class="text-sm text-text-secondary">${new Date(exp.date + 'T03:00:00Z').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p></div><p class="font-bold text-lg">${formatCurrency(exp.value)}</p></div>`).join('');
+        };
+
+        const showExpenseModal = (expenseData = {}) => {
+            const { id, date, category, description, value } = expenseData;
+            currentEditingId = id || null;
+            const isEditing = currentEditingId !== null;
+            const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
+            const modalHTML = `<div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color"><form id="expense-form-inner"><div class="flex justify-between items-center p-5 border-b border-border-color"><h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3><button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button></div><div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5"><div><label class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full" required value="${date || toISODateString(currentDate)}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full" required>${categoryOptions}</select></div><div class="sm:col-span-2"><label class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full" required value="${description || ''}"></div><div class="sm:col-span-2"><label class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full" required value="${value || ''}"></div></div><div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}<div class="flex gap-4"><button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div></div></form></div>`;
+            DOM.modalContainer.innerHTML = modalHTML;
+            DOM.mainContainer.classList.add('modal-open'); DOM.modalContainer.classList.add('visible'); DOM.body.classList.add('modal-open-body');
+            setTimeout(() => document.getElementById('form-description').focus(), 50);
+        };
+        const hideExpenseModal = () => { DOM.mainContainer.classList.remove('modal-open'); DOM.modalContainer.classList.remove('visible'); DOM.body.classList.remove('modal-open-body'); setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300); };
+        const handleSalaryChange = async () => { /* ... */ };
+        
+        DOM.salary1Input.addEventListener('change', handleSalaryChange);
         DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
         DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
         DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
-        DOM.expensesList.addEventListener('click', (e) => { 
-            const card = e.target.closest('.expense-card'); 
-            if (card) {
-                const expense = expensesData.find(exp => exp.id === parseInt(card.dataset.id));
-                if (expense) showExpenseModal(expense);
-            }
-        });
-        
-        DOM.modalContainer.addEventListener('click', async (e) => { 
-            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') {
-                hideExpenseModal();
-            }
-            if (e.target.id === 'delete-btn' && currentEditingId && confirm('Tem certeza que deseja excluir?')) {
-                const { error } = await supabaseClient.from('expenses').delete().eq('id', currentEditingId);
-                if (error) { 
-                    showToast('Erro ao excluir.', 'error'); 
-                } else { 
-                    await renderMonthView(); 
-                    hideExpenseModal(); 
-                    showToast('Excluído com sucesso!');
-                }
-            }
-        });
-
-        DOM.modalContainer.addEventListener('submit', async (e) => { 
-            if (e.target.id === 'expense-form-inner') {
-                e.preventDefault();
-                const formDate = document.getElementById('form-date').value;
-                const expenseObject = { 
-                    date: formDate, 
-                    month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')), 
-                    description: document.getElementById('form-description').value, 
-                    category: document.getElementById('form-category').value, 
-                    value: parseFloat(document.getElementById('form-value').value) || 0
-                }; 
-                
-                const { error } = currentEditingId 
-                    ? await supabaseClient.from('expenses').update(expenseObject).eq('id', currentEditingId) 
-                    : await supabaseClient.from('expenses').insert(expenseObject);
-
-                if (error) { 
-                    showToast('Erro ao salvar.', 'error'); 
-                } else { 
-                    await renderMonthView(); 
-                    hideExpenseModal(); 
-                    showToast('Salvo com sucesso!');
-                }
-            }
-        });
+        DOM.expensesList.addEventListener('click', (e) => { /* ... */ });
+        DOM.modalContainer.addEventListener('click', async (e) => { /* ... */ });
+        DOM.modalContainer.addEventListener('submit', async (e) => { /* ... */ });
 
         // =================================================================================
         // MÓDULO DE VEÍCULO INTEGRADO COM SUPABASE
@@ -268,45 +228,16 @@
                 if (fuelRes.error) throw fuelRes.error;
                 if (maintRes.error) throw maintRes.error;
                 if (tripRes.error) throw tripRes.error;
-
-                vehicleData = {
-                    profile: profileRes.data || {}, 
-                    fuelHistory: fuelRes.data || [],
-                    maintenanceHistory: maintRes.data || [], 
-                    tripHistory: tripRes.data || []
-                }; 
+                vehicleData = { profile: profileRes.data || {}, fuelHistory: fuelRes.data || [], maintenanceHistory: maintRes.data || [], tripHistory: tripRes.data || [] };
                 return true;
-            } catch (error) { 
-                console.error("Erro ao carregar dados do veículo:", error); 
-                showToast('Falha ao carregar dados do veículo.', 'error'); 
-                return false; 
-            }
+            } catch (error) { console.error("Erro ao carregar dados do veículo:", error); showToast('Falha ao carregar dados do veículo.', 'error'); return false; }
         };
 
         const showCarModal = async () => {
-            const modalHTML = `
-                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;">
-                    <div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
-                        <h3 class="text-xl font-display">Painel Inteligente do Veículo</h3>
-                        <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                    </div>
-                    <div class="p-4 border-b border-border-color flex-shrink-0">
-                        <div id="car-tabs" class="flex items-center gap-2 sm:gap-4 overflow-x-auto">
-                            <button class="tab-btn active" data-tab="overview">Visão Geral</button>
-                            <button class="tab-btn" data-tab="profile">Perfil</button>
-                            <button class="tab-btn" data-tab="fuel">Abastecimentos</button>
-                            <button class="tab-btn" data-tab="trips">Viagens</button>
-                            <button class="tab-btn" data-tab="maintenance">Manutenções</button>
-                        </div>
-                    </div>
-                    <div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div>
-                </div>`;
+            const modalHTML = `<div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;"><div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0"><h3 class="text-xl font-display">Painel Inteligente do Veículo</h3><button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button></div><div class="p-4 border-b border-border-color flex-shrink-0"><div id="car-tabs" class="flex items-center gap-2 sm:gap-4 overflow-x-auto"><button class="tab-btn active" data-tab="overview">Visão Geral</button><button class="tab-btn" data-tab="profile">Perfil</button><button class="tab-btn" data-tab="fuel">Abastecimentos</button><button class="tab-btn" data-tab="trips">Viagens</button><button class="tab-btn" data-tab="maintenance">Manutenções</button></div></div><div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div></div>`;
             DOM.carModalContainer.innerHTML = modalHTML;
             showLoading(document.getElementById('car-modal-content'));
-            DOM.mainContainer.classList.add('modal-open'); 
-            DOM.carModalContainer.classList.add('visible'); 
-            DOM.body.classList.add('modal-open-body');
-            
+            DOM.mainContainer.classList.add('modal-open'); DOM.carModalContainer.classList.add('visible'); DOM.body.classList.add('modal-open-body');
             if (await loadVehicleData()) {
                 renderCarTab('overview');
             } else {
@@ -314,19 +245,79 @@
             }
         };
 
-        const hideCarModal = () => {
-            DOM.mainContainer.classList.remove('modal-open'); 
-            DOM.carModalContainer.classList.remove('visible'); 
-            DOM.body.classList.remove('modal-open-body'); 
-            setTimeout(() => { DOM.carModalContainer.innerHTML = ''; }, 300);
-        };
+        const hideCarModal = () => { DOM.mainContainer.classList.remove('modal-open'); DOM.carModalContainer.classList.remove('visible'); DOM.body.classList.remove('modal-open-body'); setTimeout(() => { DOM.carModalContainer.innerHTML = ''; }, 300); };
         
-        const getLatestOdometer = () => { /* ... Lógica existente ... */ };
-        const calculateAverageConsumption = () => { /* ... Lógica existente ... */ };
-        const formatDuration = (seconds) => { /* ... Lógica existente ... */ };
+        const getLatestOdometer = () => {
+            const p = vehicleData.profile || {};
+            const allKms = [
+                ...(vehicleData.fuelHistory || []).map(f => f.odometer),
+                ...(vehicleData.maintenanceHistory || []).map(m => m.last_service_km),
+                p.last_oil_change_km || 0
+            ];
+            return Math.max(...allKms, 0);
+        };
+        const calculateAverageConsumption = () => {
+            const history = vehicleData.fuelHistory || [];
+            if (history.length < 2) return 0;
+            let km = history[0].odometer - history[history.length - 1].odometer;
+            let liters = history.slice(0, -1).reduce((s, l) => s + l.liters, 0);
+            return liters > 0 ? km / liters : 0;
+        };
+        const formatDuration = (seconds) => {
+            const h = Math.floor(seconds / 3600); const m = Math.floor((seconds % 3600) / 60);
+            let str = ''; if (h > 0) str += `${h}h `; if (m > 0) str += `${m}min`;
+            return str.trim() || '0min';
+        };
 
-        const renderCarTab = (tabId) => { /* ... Lógica existente e completa da versão anterior ... */ };
-        const calculateTripDetails = async (origin, destination, fuelPrice) => { /* ... Lógica existente ... */ };
+        const renderCarTab = (tabId) => {
+            const contentEl = document.getElementById('car-modal-content'); if (!contentEl) return;
+            const latestOdometer = getLatestOdometer(); let html = '';
+            switch(tabId) {
+                case 'overview': {
+                    const avgConsumption = calculateAverageConsumption(); const p = vehicleData.profile || {};
+                    const oilChangeInterval = p.oil_change_km_interval || 10000; const lastOilChangeKm = p.last_oil_change_km || 0;
+                    const kmSinceOilChange = latestOdometer - lastOilChangeKm; const oilProgress = Math.min((kmSinceOilChange / oilChangeInterval) * 100, 100);
+                    const oilKmRemaining = Math.max(0, oilChangeInterval - kmSinceOilChange);
+                    let oilProgressColor = oilProgress >= 100 ? 'bg-red-500' : oilProgress > 80 ? 'bg-yellow-500' : 'bg-indigo-500';
+                    html = `<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center"><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">${latestOdometer.toLocaleString('pt-BR')} km</p></div><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Consumo Médio</h4><p class="text-2xl font-bold">${avgConsumption.toFixed(2)} km/L</p></div><div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">${oilKmRemaining.toLocaleString('pt-BR')} km</p></div></div><div class="space-y-4"><h3 class="font-display text-lg">Alertas de Manutenção</h3><div class="bg-background-color p-4 rounded-lg"><div class="flex justify-between items-center mb-1"><span class="font-semibold">Troca de Óleo</span><span class="text-sm font-medium ${oilProgress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceOilChange.toLocaleString('pt-BR')} / ${oilChangeInterval.toLocaleString('pt-BR')} km</span></div><div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${oilProgressColor}" style="width: ${oilProgress}%"></div></div></div>${(vehicleData.maintenanceHistory || []).map(maint => { const kmSinceService = latestOdometer - maint.last_service_km; const progress = Math.min((kmSinceService / maint.km_interval) * 100, 100); const kmRemaining = Math.max(0, maint.km_interval - kmSinceService); let progressColor = progress >= 100 ? 'bg-red-500' : progress > 80 ? 'bg-yellow-500' : 'bg-indigo-500'; return `<div class="bg-background-color p-4 rounded-lg"><div class="flex justify-between items-center mb-1"><span class="font-semibold">${maint.item} <small class="text-text-secondary">(próxima em ${kmRemaining.toLocaleString('pt-BR')} km)</small></span><span class="text-sm font-medium ${progress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceService.toLocaleString('pt-BR')} / ${maint.km_interval.toLocaleString('pt-BR')} km</span></div><div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${progressColor}" style="width: ${progress}%"></div></div></div>`; }).join('')}</div>`; break;
+                }
+                case 'profile': {
+                    const p = vehicleData.profile || {};
+                    html = `<form id="car-profile-form" class="space-y-4"><h3 class="font-display text-lg">Perfil do Veículo</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-text-secondary mb-1">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="${p.model || ''}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="${p.plate || ''}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Intervalo Troca de Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="${p.oil_change_km_interval || '10000'}"></div><div><label class="block text-sm font-medium text-text-secondary mb-1">Última Troca de Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="${p.last_oil_change_km || '0'}"></div></div><div class="text-right pt-2"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Salvar Perfil</button></div></form>`; break;
+                }
+                case 'fuel': {
+                     html = `<form id="fuel-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Registrar Abastecimento</h3><div class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="${toISODateString(new Date())}"></div><div><label class="block text-sm text-text-secondary">Odômetro</label><input type="number" id="fuel-odometer" placeholder="${latestOdometer}" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Litros (L)</label><input type="number" step="0.01" id="fuel-liters" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Valor Total (R$)</label><input type="number" step="0.01" id="fuel-total-value" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar</button></div></form><h3 class="font-display text-lg mb-3">Histórico de Abastecimentos</h3><div class="space-y-2 max-h-80 overflow-y-auto pr-2">${(vehicleData.fuelHistory || []).map((current, index, arr) => { const previous = arr[index + 1]; let efficiencyText = `<span class="text-xs text-text-secondary">-- km/L</span>`; if (previous) { const dist = current.odometer - previous.odometer; if (dist > 0 && current.liters > 0) efficiencyText = `<span class="font-semibold text-green-400">${(dist / current.liters).toFixed(2)} km/L</span>`; } return `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm"><div><p class="font-semibold">${new Date(current.date + 'T03:00:00Z').toLocaleDateString('pt-BR')}</p><p class="text-text-secondary">${current.odometer.toLocaleString('pt-BR')} km &bull; ${current.liters} L &bull; ${formatCurrency(current.total_value)}</p></div>${efficiencyText}</div>`; }).join('') || `<p class="text-text-secondary text-center p-4">Nenhum registro.</p>`}</div>`; break;
+                }
+                case 'trips': {
+                    const sortedTrips = vehicleData.tripHistory || [];
+                    html = `<form id="trip-calculator-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Calculadora de Rota e Custo (API Mapbox)</h3><div class="grid grid-cols-1 sm:grid-cols-2 gap-4"><div><label class="block text-sm text-text-secondary">Origem</label><input type="text" id="trip-origin" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Destino</label><input type="text" id="trip-destination" class="form-input w-full"></div><div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Preço do Combustível (R$/L)</label><input type="number" step="0.01" id="trip-fuel-price" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Calcular Rota</button></div></form><div id="trip-result" class="mb-6 hidden"></div><form id="trip-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Registro Manual de Viagens</h3><div class="grid grid-cols-1 sm:grid-cols-3 gap-4"><div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="trip-date" class="form-input w-full" value="${toISODateString(new Date())}"></div><div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Descrição</label><input type="text" id="trip-desc" placeholder="Viagem para a praia" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Distância (km)</label><input type="number" id="trip-dist" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar Viagem</button></div></form><h3 class="font-display text-lg mb-3">Histórico de Viagens</h3><div class="space-y-2 max-h-60 overflow-y-auto pr-2">${sortedTrips.map(trip => `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm"><div><p class="font-semibold">${trip.description}</p><p class="text-text-secondary">${new Date(trip.date+'T03:00:00Z').toLocaleDateString('pt-BR')}</p></div><p class="font-semibold">${trip.distance.toLocaleString('pt-BR')} km</p></div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma viagem registrada.</p>`}</div>`;
+                    break;
+                }
+                case 'maintenance': {
+                    html = `<form id="maint-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6"><h3 class="font-display text-lg">Agendar Nova Manutenção</h3><div class="grid grid-cols-1 sm:grid-cols-3 gap-4"><div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Item</label><input type="text" id="maint-item" placeholder="Troca de Pneus" class="form-input w-full"></div><div><label class="block text-sm text-text-secondary">Intervalo (km)</label><input type="number" id="maint-interval" placeholder="40000" class="form-input w-full"></div></div><div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Agendar</button></div></form><h3 class="font-display text-lg mb-3">Manutenções Agendadas</h3><div class="space-y-2 max-h-80 overflow-y-auto pr-2">${(vehicleData.maintenanceHistory || []).map(maint => `<div class="bg-background-color p-3 rounded-lg text-sm"><div class="flex justify-between items-start"><div><p class="font-semibold">${maint.item}</p><p class="text-text-secondary">Último serviço em ${maint.last_service_km.toLocaleString('pt-BR')} km</p></div><div class="flex gap-2"><button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="${maint.id}"><svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button><button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="${maint.id}"><svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button></div></div></div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma manutenção agendada.</p>`}</div>`; break;
+                }
+            }
+            contentEl.innerHTML = html;
+        };
+
+        const calculateTripDetails = async (origin, destination, fuelPrice) => {
+            const consumption = calculateAverageConsumption(); if (consumption <= 0) { showToast('Calcule o consumo médio primeiro.', 'error'); return; }
+            const resultDiv = document.getElementById('trip-result'); resultDiv.classList.remove('hidden'); resultDiv.innerHTML = `<p class="text-center p-4">Calculando...</p>`;
+            try {
+                const geocodeUrl = (p) => `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(p)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1`;
+                const [originRes, destRes] = await Promise.all([fetch(geocodeUrl(origin)), fetch(geocodeUrl(destination))]);
+                const originData = await originRes.json(); const destData = await destRes.json();
+                if (!originData.features?.length) throw new Error(`Origem não encontrada: ${origin}`);
+                if (!destData.features?.length) throw new Error(`Destino não encontrado: ${destination}`);
+                const [oc, dc] = [originData.features[0].center, destData.features[0].center];
+                const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${oc[0]},${oc[1]};${dc[0]},${dc[1]}?access_token=${MAPBOX_ACCESS_TOKEN}`;
+                const directionsResponse = await fetch(directionsUrl); const directionsData = await directionsResponse.json();
+                if (directionsData.code !== 'Ok') throw new Error(directionsData.message || 'Não foi possível calcular a rota.');
+                const route = directionsData.routes[0];
+                const distanceInKm = route.distance / 1000; const cost = (distanceInKm / consumption) * fuelPrice;
+                resultDiv.innerHTML = `<div class="p-4 rounded-lg bg-background-color border border-border-color"><h5 class="font-bold text-lg mb-2">Resultado da Rota</h5><div class="grid grid-cols-3 gap-2 text-center"><div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div><div><p class="text-sm text-text-secondary">Duração Est.</p><p class="font-bold text-xl">${formatDuration(route.duration)}</p></div><div><p class="text-sm text-text-secondary">Custo Est.</p><p class="font-bold text-xl text-brand">${formatCurrency(cost)}</p></div></div><div class="text-center mt-4"><button id="add-trip-as-expense" data-value="${cost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button></div></div>`;
+            } catch(error) { console.error("Erro na API Mapbox:", error); resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`; showToast('Erro ao calcular rota.', 'error');}
+        };
 
         DOM.carModuleBtn.addEventListener('click', showCarModal);
         
@@ -340,22 +331,59 @@
                 tabBtn.classList.add('active');
                 renderCarTab(tabBtn.dataset.tab);
             }
-            if (e.target.id === 'add-trip-as-expense') {
+            if(e.target.id === 'add-trip-as-expense'){
                 hideCarModal();
                 showExpenseModal({ category: 'Carro', description: e.target.dataset.desc, value: parseFloat(e.target.dataset.value) });
             }
-            // ... Lógica para botões de manutenção (delete/done)
+            const deleteBtn = e.target.closest('.maint-delete-btn');
+            if (deleteBtn && confirm('Tem certeza?')) {
+                const { error } = await supabaseClient.from('maintenance_history').delete().eq('id', deleteBtn.dataset.id);
+                if(error){ showToast('Erro ao excluir.', 'error'); console.error(error); }
+                else { showToast('Excluído.'); await loadVehicleData(); renderCarTab('maintenance'); }
+            }
+            const doneBtn = e.target.closest('.maint-done-btn');
+            if (doneBtn) {
+                const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, getLatestOdometer());
+                if (newOdometer && !isNaN(newOdometer)) {
+                    const { error } = await supabaseClient.from('maintenance_history').update({ last_service_km: parseInt(newOdometer) }).eq('id', doneBtn.dataset.id);
+                    if(error){ showToast('Erro ao registrar.', 'error'); console.error(error); }
+                    else { showToast('Manutenção registrada!'); await loadVehicleData(); renderCarTab('maintenance'); }
+                }
+            }
         });
 
         DOM.carModalContainer.addEventListener('submit', async (e) => {
             e.preventDefault();
             const form = e.target;
             const submitBtn = form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.disabled = true;
+            if(submitBtn) submitBtn.disabled = true;
 
-            // Lógica para cada formulário do módulo de veículo (profile, fuel, maintenance, trips)
-            
-            if (submitBtn) submitBtn.disabled = false;
+            if (form.id === 'car-profile-form') {
+                const profileData = { id: vehicleData.profile?.id || 1, model: form.querySelector('#car-model').value, plate: form.querySelector('#car-plate').value, oil_change_km_interval: parseInt(form.querySelector('#car-oil-interval').value), last_oil_change_km: parseInt(form.querySelector('#car-last-oil').value) };
+                const { error } = await supabaseClient.from('vehicle_profile').upsert(profileData, { onConflict: 'id' });
+                if (error) { showToast('Erro ao salvar perfil.', 'error'); console.error(error); } else { showToast('Perfil salvo!'); await loadVehicleData(); renderCarTab('profile'); }
+            }
+            if (form.id === 'fuel-log-form') {
+                const fuelData = { date: form.querySelector('#fuel-date').value, odometer: parseInt(form.querySelector('#fuel-odometer').value), liters: parseFloat(form.querySelector('#fuel-liters').value), total_value: parseFloat(form.querySelector('#fuel-total-value').value) };
+                if (!fuelData.odometer || !fuelData.liters || !fuelData.total_value) { showToast('Preencha todos os campos.', 'error'); }
+                else { const { error } = await supabaseClient.from('fuel_history').insert(fuelData); if (error) { showToast('Erro ao registrar.', 'error'); console.error(error); } else { showToast('Abastecimento registrado!'); await loadVehicleData(); renderCarTab('fuel'); } }
+            }
+            if (form.id === 'maint-log-form') {
+                const maintData = { item: form.querySelector('#maint-item').value, km_interval: parseInt(form.querySelector('#maint-interval').value), last_service_km: getLatestOdometer() };
+                if (!maintData.item || !maintData.km_interval) { showToast('Preencha todos os campos.', 'error'); }
+                else { const { error } = await supabaseClient.from('maintenance_history').insert(maintData); if (error) { showToast('Erro ao agendar.', 'error'); console.error(error); } else { showToast('Manutenção agendada!'); await loadVehicleData(); renderCarTab('maintenance'); } }
+            }
+            if (form.id === 'trip-calculator-form') {
+                const o=form.querySelector('#trip-origin').value,d=form.querySelector('#trip-destination').value,f=parseFloat(form.querySelector('#trip-fuel-price').value);
+                if(!o||!d||!f) showToast('Preencha todos os campos.','error'); else await calculateTripDetails(o,d,f);
+            }
+            if (form.id === 'trip-log-form') {
+                const tripData = { date: form.querySelector('#trip-date').value, description: form.querySelector('#trip-desc').value, distance: parseInt(form.querySelector('#trip-dist').value) };
+                if (!tripData.description || !tripData.distance) { showToast('Preencha os campos.', 'error'); } 
+                else { const { error } = await supabaseClient.from('trip_history').insert(tripData); if (error) { showToast('Erro ao registrar.', 'error'); console.error(error); } else { showToast('Viagem registrada!'); await loadVehicleData(); renderCarTab('trips'); } }
+            }
+
+            if(submitBtn) submitBtn.disabled = false;
         });
 
         // Chamada Inicial
@@ -364,6 +392,7 @@
 </script>
 </body>
 </html>
+
 
 
 
