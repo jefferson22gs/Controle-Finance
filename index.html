@@ -43,15 +43,16 @@
             const password = document.getElementById('password-input').value;
 			const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 			// ...
-			supabaseClient.auth.onAuthStateChange((event, session) => { ... });
-            if (error) {
-                messageDiv.textContent = 'E-mail ou senha inválidos.';
-            } else {
-                window.location.href = 'controle_car.html';
-            }
-            loginBtn.textContent = 'Entrar';
-            loginBtn.disabled = false;
-        });
+			supabaseClient.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    // Usuário logado → redireciona para o painel
+    window.location.href = "controle_car.html";
+  } else {
+    // Usuário deslogado → volta para login
+    console.log("Usuário não autenticado");
+  }
+});
+
 
         supabase.auth.onAuthStateChange((event, session) => {
             if (session) {
@@ -62,3 +63,4 @@
 </body>
 
 </html>
+
