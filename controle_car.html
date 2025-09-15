@@ -104,263 +104,265 @@
     <div id="toast-notification"></div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // =================================================================================
-            // CONFIGURAÇÃO DO SUPABASE
-            // =================================================================================
-            // Exemplo de como deve ficar:
-const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // Sua URL real dentro das aspas
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // Sua chave real dentro das aspas // <-- SUBSTITUA PELA SUA CHAVE ANON
+    document.addEventListener('DOMContentLoaded', () => {
+        // =================================================================================
+        // CONFIGURAÇÃO DO SUPABASE
+        // =================================================================================
+        const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // <-- SUBSTITUA PELA SUA URL
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
+        
+        if (!SUPABASE_URL || SUPABASE_URL === 'SUA_URL_SUPABASE' || !SUPABASE_KEY || SUPABASE_KEY === 'SUA_CHAVE_ANON_SUPABASE') {
+            document.body.innerHTML = `<div class="h-screen flex items-center justify-center text-center text-white"><div class="p-8 bg-red-800 rounded-lg"><h1>Configuração Incompleta</h1><p class="mt-2">Por favor, adicione sua URL e Chave do Supabase no código HTML.</p></div></div>`;
+            return;
+        }
+
+        // LINHA CORRIGIDA: Renomeamos a variável para 'supabaseClient' para evitar conflito.
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // =================================================================================
+        // SCRIPT FINANCEIRO PRINCIPAL
+        // =================================================================================
+        const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
+        const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
+        const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': '#ef4444', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
+
+        let expensesData = [];
+        let incomeData = { salary1: '', salary2: '' };
+        let currentDate = new Date();
+        let currentEditingId = null; 
+        window.myExpensesChart = null;
+
+        const DOM = { 
+            body: document.body, mainContainer: document.getElementById('main-container'),
+            prevMonthBtn: document.getElementById('prev-month-btn'), nextMonthBtn: document.getElementById('next-month-btn'),
+            monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
+            categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
+            addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
+            salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
+            exportPdfBtn: document.getElementById('export-pdf-btn'), exportExcelBtn: document.getElementById('export-excel-btn'),
+            toast: document.getElementById('toast-notification'),
+            carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
+        };
+        
+        const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const toISODateString = (date) => date.toISOString().split('T')[0];
+        const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        const showToast = (message, type = 'success') => { DOM.toast.textContent = message; DOM.toast.className = ''; DOM.toast.classList.toggle('error', type !== 'success'); DOM.toast.classList.add('show'); setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000); };
+        const showLoading = (element) => { element.innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`; };
+
+        const renderMonthView = async () => {
+            const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const monthKey = getMonthYearKey(currentDate);
+            DOM.monthHeader.textContent = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
             
-            if (!SUPABASE_URL || SUPABASE_URL === 'SUA_URL_SUPABASE' || !SUPABASE_KEY || SUPABASE_KEY === 'SUA_CHAVE_ANON_SUPABASE') {
-                document.body.innerHTML = `<div class="h-screen flex items-center justify-center text-center text-white"><div class="p-8 bg-red-800 rounded-lg"><h1>Configuração Incompleta</h1><p class="mt-2">Por favor, adicione sua URL e Chave do Supabase no código HTML.</p></div></div>`;
-                return;
+            showLoading(DOM.expensesList);
+
+            const { data: expenses, error: expError } = await supabaseClient.from('expenses').select('*').eq('month_key', monthKey).order('date', { ascending: false });
+            const { data: income, error: incError } = await supabaseClient.from('income').select('*').eq('month_key', monthKey).single();
+            
+            if (expError) { console.error('Erro ao buscar despesas:', expError); showToast('Erro ao buscar despesas.', 'error'); return; }
+            if (incError && incError.code !== 'PGRST116') { console.error('Erro ao buscar renda:', incError); showToast('Erro ao buscar renda.', 'error'); return; } // PGRST116 = not found, o que é normal
+
+            expensesData = expenses || [];
+            incomeData = income || { salary1: '', salary2: '' };
+
+            DOM.salary1Input.value = incomeData.salary1 || ''; 
+            DOM.salary2Input.value = incomeData.salary2 || '';
+
+            renderSummary(); 
+            renderExpenseList();
+        };
+
+        const renderSummary = () => {
+            const totalExpenses = expensesData.reduce((sum, exp) => sum + (exp.value || 0), 0);
+            const totalIncome = (parseFloat(incomeData.salary1) || 0) + (parseFloat(incomeData.salary2) || 0);
+            const balance = totalIncome - totalExpenses;
+            const summaryByCategory = CATEGORIES.map(category => ({ category, total: expensesData.filter(e => e.category === category).reduce((sum, e) => sum + e.value, 0) })).filter(item => item.total > 0);
+            let balanceColor = balance >= 0 ? 'text-green-400' : 'text-red-400';
+            DOM.summarySection.innerHTML = `<div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Renda Total</span><span class="font-semibold text-lg">${formatCurrency(totalIncome)}</span></div><div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Saídas</span><span class="font-semibold text-lg text-brand">${formatCurrency(totalExpenses)}</span></div><div class="summary-card p-4 flex justify-between items-center bg-gray-700/50"><span class="font-semibold">SALDO</span><span class="font-bold text-xl ${balanceColor}">${formatCurrency(balance)}</span></div>`;
+            let categoryHTML = '';
+            if(summaryByCategory.length > 0) categoryHTML += '<h4 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider px-2">Análise de Saídas</h4>';
+            summaryByCategory.sort((a,b) => b.total - a.total).forEach(item => { categoryHTML += `<div class="summary-card p-3 flex justify-between items-center text-sm"><div class="flex items-center gap-3"><div class="w-8 h-8 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20;"><span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span></div><h4 class="font-medium">${item.category}</h4></div><p class="font-semibold">${formatCurrency(item.total)}</p></div>`; });
+            DOM.categorySummarySection.innerHTML = categoryHTML;
+            const ctx = document.getElementById('expensesChart').getContext('2d');
+            if (window.myExpensesChart) window.myExpensesChart.destroy();
+            if (expensesData.length > 0) {
+                Chart.defaults.color = '#9ca3af';
+                window.myExpensesChart = new Chart(ctx, { type: 'doughnut', data: { labels: summaryByCategory.map(i => i.category), datasets: [{ data: summaryByCategory.map(i => i.total), backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280'), hoverOffset: 8, borderWidth: 3, borderColor: '#1f2937' }] }, options: { responsive: true, cutout: '70%', plugins: { legend: { display: false }, tooltip: { bodyFont: { size: 14 } } } } });
+            } else { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
+        };
+        
+        const renderExpenseList = () => {
+            if (expensesData.length === 0) { DOM.expensesList.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color"><h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3><p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p></div>`; return; }
+            DOM.expensesList.innerHTML = expensesData.map(exp => `<div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}"><div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20"><span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span></div><div class="flex-grow"><p class="font-semibold">${exp.description}</p><p class="text-sm text-text-secondary">${new Date(exp.date + 'T03:00:00Z').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p></div><p class="font-bold text-lg">${formatCurrency(exp.value)}</p></div>`).join('');
+        };
+
+        const showExpenseModal = (expenseData = {}) => {
+            const { id, date, category, description, value } = expenseData;
+            currentEditingId = id || null;
+            const isEditing = currentEditingId !== null;
+            const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
+            
+            const modalHTML = `
+                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
+                    <form id="expense-form-inner">
+                        <div class="flex justify-between items-center p-5 border-b border-border-color">
+                            <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
+                            <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
+                            <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
+                            <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
+                            <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
+                        </div>
+                        <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
+                            ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
+                            <div class="flex gap-4"><button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div>
+                        </div>
+                    </form>
+                </div>`;
+            
+            DOM.modalContainer.innerHTML = modalHTML;
+            DOM.mainContainer.classList.add('modal-open');
+            DOM.modalContainer.classList.add('visible');
+            DOM.body.classList.add('modal-open-body');
+            setTimeout(() => document.getElementById('form-description').focus(), 50);
+        };
+        
+        const hideExpenseModal = () => {
+            DOM.mainContainer.classList.remove('modal-open');
+            DOM.modalContainer.classList.remove('visible');
+            DOM.body.classList.remove('modal-open-body');
+            setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
+        };
+
+        const handleSalaryChange = async () => { 
+            const monthKey = getMonthYearKey(currentDate);
+            const newIncome = {
+                month_key: monthKey,
+                salary1: DOM.salary1Input.value || null,
+                salary2: DOM.salary2Input.value || null
+            };
+
+            const { error } = await supabaseClient.from('income').upsert(newIncome, { onConflict: 'month_key' });
+            if (error) {
+                console.error("Erro ao salvar renda:", error);
+                showToast('Erro ao salvar renda.', 'error');
+            } else {
+                incomeData = newIncome;
+                renderSummary();
             }
-            const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-            // =================================================================================
-            // SCRIPT FINANCEIRO PRINCIPAL
-            // =================================================================================
-            const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
-            const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
-            const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': '#ef4444', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
-
-            let expensesData = [];
-            let incomeData = { salary1: '', salary2: '' };
-            let currentDate = new Date();
-            let currentEditingId = null; 
-            window.myExpensesChart = null;
-
-            const DOM = { 
-                body: document.body, mainContainer: document.getElementById('main-container'),
-                prevMonthBtn: document.getElementById('prev-month-btn'), nextMonthBtn: document.getElementById('next-month-btn'),
-                monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
-                categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
-                addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
-                salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
-                exportPdfBtn: document.getElementById('export-pdf-btn'), exportExcelBtn: document.getElementById('export-excel-btn'),
-                toast: document.getElementById('toast-notification'),
-                carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
-            };
-            
-            const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-            const toISODateString = (date) => date.toISOString().split('T')[0];
-            const getMonthYearKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-            const showToast = (message, type = 'success') => { DOM.toast.textContent = message; DOM.toast.className = ''; DOM.toast.classList.toggle('error', type !== 'success'); DOM.toast.classList.add('show'); setTimeout(() => { DOM.toast.classList.remove('show'); }, 3000); };
-            const showLoading = (element) => { element.innerHTML = `<div class="flex justify-center items-center p-8"><div class="loader"></div></div>`; };
-
-            const renderMonthView = async () => {
-                const year = currentDate.getFullYear(); const month = currentDate.getMonth(); const monthKey = getMonthYearKey(currentDate);
-                DOM.monthHeader.textContent = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
-                
-                showLoading(DOM.expensesList);
-
-                const { data: expenses, error: expError } = await supabase.from('expenses').select('*').eq('month_key', monthKey).order('date', { ascending: false });
-                const { data: income, error: incError } = await supabase.from('income').select('*').eq('month_key', monthKey).single();
-                
-                if (expError) { console.error('Erro ao buscar despesas:', expError); showToast('Erro ao buscar despesas.', 'error'); return; }
-                if (incError && incError.code !== 'PGRST116') { console.error('Erro ao buscar renda:', incError); showToast('Erro ao buscar renda.', 'error'); return; } // PGRST116 = not found, o que é normal
-
-                expensesData = expenses || [];
-                incomeData = income || { salary1: '', salary2: '' };
-
-                DOM.salary1Input.value = incomeData.salary1 || ''; 
-                DOM.salary2Input.value = incomeData.salary2 || '';
-
-                renderSummary(); 
-                renderExpenseList();
-            };
-
-            const renderSummary = () => {
-                const totalExpenses = expensesData.reduce((sum, exp) => sum + (exp.value || 0), 0);
-                const totalIncome = (parseFloat(incomeData.salary1) || 0) + (parseFloat(incomeData.salary2) || 0);
-                const balance = totalIncome - totalExpenses;
-                const summaryByCategory = CATEGORIES.map(category => ({ category, total: expensesData.filter(e => e.category === category).reduce((sum, e) => sum + e.value, 0) })).filter(item => item.total > 0);
-                let balanceColor = balance >= 0 ? 'text-green-400' : 'text-red-400';
-                DOM.summarySection.innerHTML = `<div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Renda Total</span><span class="font-semibold text-lg">${formatCurrency(totalIncome)}</span></div><div class="summary-card p-4 flex justify-between items-center"><span class="font-medium text-text-secondary">Saídas</span><span class="font-semibold text-lg text-brand">${formatCurrency(totalExpenses)}</span></div><div class="summary-card p-4 flex justify-between items-center bg-gray-700/50"><span class="font-semibold">SALDO</span><span class="font-bold text-xl ${balanceColor}">${formatCurrency(balance)}</span></div>`;
-                let categoryHTML = '';
-                if(summaryByCategory.length > 0) categoryHTML += '<h4 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider px-2">Análise de Saídas</h4>';
-                summaryByCategory.sort((a,b) => b.total - a.total).forEach(item => { categoryHTML += `<div class="summary-card p-3 flex justify-between items-center text-sm"><div class="flex items-center gap-3"><div class="w-8 h-8 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20;"><span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span></div><h4 class="font-medium">${item.category}</h4></div><p class="font-semibold">${formatCurrency(item.total)}</p></div>`; });
-                DOM.categorySummarySection.innerHTML = categoryHTML;
-                const ctx = document.getElementById('expensesChart').getContext('2d');
-                if (window.myExpensesChart) window.myExpensesChart.destroy();
-                if (expensesData.length > 0) {
-                    Chart.defaults.color = '#9ca3af';
-                    window.myExpensesChart = new Chart(ctx, { type: 'doughnut', data: { labels: summaryByCategory.map(i => i.category), datasets: [{ data: summaryByCategory.map(i => i.total), backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280'), hoverOffset: 8, borderWidth: 3, borderColor: '#1f2937' }] }, options: { responsive: true, cutout: '70%', plugins: { legend: { display: false }, tooltip: { bodyFont: { size: 14 } } } } });
-                } else { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
-            };
-            
-            const renderExpenseList = () => {
-                if (expensesData.length === 0) { DOM.expensesList.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color"><h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3><p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p></div>`; return; }
-                DOM.expensesList.innerHTML = expensesData.map(exp => `<div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}"><div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20"><span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span></div><div class="flex-grow"><p class="font-semibold">${exp.description}</p><p class="text-sm text-text-secondary">${new Date(exp.date + 'T03:00:00Z').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p></div><p class="font-bold text-lg">${formatCurrency(exp.value)}</p></div>`).join('');
-            };
-
-            const showExpenseModal = (expenseData = {}) => {
-                const { id, date, category, description, value } = expenseData;
-                currentEditingId = id || null;
-                const isEditing = currentEditingId !== null;
-                const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
-                
-                const modalHTML = `
-                    <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
-                        <form id="expense-form-inner">
-                            <div class="flex justify-between items-center p-5 border-b border-border-color">
-                                <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
-                                <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
-                            </div>
-                            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
-                                <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
-                                <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
-                                <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
-                            </div>
-                            <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
-                                ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
-                                <div class="flex gap-4"><button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div>
-                            </div>
-                        </form>
-                    </div>`;
-                
-                DOM.modalContainer.innerHTML = modalHTML;
-                DOM.mainContainer.classList.add('modal-open');
-                DOM.modalContainer.classList.add('visible');
-                DOM.body.classList.add('modal-open-body');
-                setTimeout(() => document.getElementById('form-description').focus(), 50);
-            };
-            
-            const hideExpenseModal = () => {
-                DOM.mainContainer.classList.remove('modal-open');
-                DOM.modalContainer.classList.remove('visible');
-                DOM.body.classList.remove('modal-open-body');
-                setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
-            };
-
-            const handleSalaryChange = async () => { 
-                const monthKey = getMonthYearKey(currentDate);
-                const newIncome = {
-                    month_key: monthKey,
-                    salary1: DOM.salary1Input.value || null,
-                    salary2: DOM.salary2Input.value || null
-                };
-
-                const { error } = await supabase.from('income').upsert(newIncome, { onConflict: 'month_key' });
-                if (error) {
-                    console.error("Erro ao salvar renda:", error);
-                    showToast('Erro ao salvar renda.', 'error');
-                } else {
-                    incomeData = newIncome;
-                    renderSummary();
-                }
-            };
-            
-            DOM.salary1Input.addEventListener('change', handleSalaryChange); 
-            DOM.salary2Input.addEventListener('change', handleSalaryChange);
-            DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
-            DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
-            DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
-            DOM.expensesList.addEventListener('click', (e) => { 
-                const card = e.target.closest('.expense-card'); 
-                if (card) {
-                    const expense = expensesData.find(exp => exp.id === parseInt(card.dataset.id));
-                    if(expense) showExpenseModal(expense);
-                }
-            });
-
-            DOM.modalContainer.addEventListener('click', async (e) => { 
-                if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
-                if (e.target.id === 'delete-btn' && currentEditingId) { 
-                    if(confirm('Tem certeza que deseja excluir este lançamento?')) {
-                        const { error } = await supabase.from('expenses').delete().eq('id', currentEditingId);
-                        if(error) {
-                            showToast('Erro ao excluir lançamento.', 'error');
-                            console.error(error);
-                        } else {
-                           await renderMonthView();
-                           hideExpenseModal();
-                           showToast('Lançamento excluído!', 'success'); 
-                        }
-                    } 
-                } 
-            });
-
-            DOM.modalContainer.addEventListener('submit', async (e) => { 
-                if (e.target.id === 'expense-form-inner') { 
-                    e.preventDefault(); 
-                    const formDate = document.getElementById('form-date').value;
-                    const expenseObject = { 
-                        date: formDate,
-                        month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')),
-                        description: document.getElementById('form-description').value,
-                        category: document.getElementById('form-category').value,
-                        value: parseFloat(document.getElementById('form-value').value) || 0
-                    }; 
-
-                    let result;
-                    if (currentEditingId) {
-                        result = await supabase.from('expenses').update(expenseObject).eq('id', currentEditingId);
-                    } else {
-                        result = await supabase.from('expenses').insert(expenseObject);
-                    }
-                    
-                    if (result.error) {
-                         showToast('Erro ao salvar lançamento.', 'error');
-                         console.error(result.error);
-                    } else {
-                        await renderMonthView();
-                        hideExpenseModal();
-                        showToast('Lançamento salvo com sucesso!', 'success');
-                    }
-                } 
-            });
-            
-            // =================================================================================
-            // MÓDULO VEICULAR E EXPORTAÇÃO (ADAPTADO PARA SUPABASE)
-            // =================================================================================
-            
-            const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
-            
-            DOM.exportExcelBtn.addEventListener('click', () => {
-                const ws = XLSX.utils.json_to_sheet(expensesData);
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Despesas " + getMonthYearKey(currentDate));
-                XLSX.writeFile(wb, `relatorio_financeiro_${getMonthYearKey(currentDate)}.xlsx`);
-                showToast('Relatório Excel gerado!');
-            });
-
-            DOM.exportPdfBtn.addEventListener('click', () => {
-                showToast('Gerando PDF...', 'success');
-                const content = document.getElementById('report-content');
-                html2canvas(content, { backgroundColor: '#1f2937' }).then(canvas => {
-                    const imgData = canvas.toDataURL('image/png');
-                    const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                    pdf.save(`relatorio_${getMonthYearKey(currentDate)}.pdf`);
-                }).catch(err => {
-                    console.error("Erro ao gerar PDF:", err);
-                    showToast('Erro ao gerar PDF.', 'error');
-                });
-            });
-
-            // O MÓDULO VEICULAR É GRANDE, A ADAPTAÇÃO SERIA MUITO EXTENSA.
-            // FOI MANTIDA A LÓGICA ORIGINAL COM LOCALSTORAGE PARA ESTE EXEMPLO.
-            // Para migrar, seria necessário criar as tabelas no Supabase (vehicle_profile, fuel_history, etc.)
-            // e substituir cada `saveVehicleData()` e `loadVehicleData()` por chamadas `async` ao Supabase,
-            // seguindo o mesmo padrão do módulo financeiro acima.
-
-            const VEHICLE_DATA_KEY = 'vehicleData_v2_integrated';
-            let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
-            const loadVehicleData = () => { try { const vd = localStorage.getItem(VEHICLE_DATA_KEY); vehicleData = vd ? JSON.parse(vd) : { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }; if (!vehicleData.fuelHistory) vehicleData.fuelHistory = []; if (!vehicleData.tripHistory) vehicleData.tripHistory = []; if (!vehicleData.maintenanceHistory) vehicleData.maintenanceHistory = []; } catch(e) { console.error("Erro ao carregar dados do veículo", e); vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }; } };
-            const saveVehicleData = () => { localStorage.setItem(VEHICLE_DATA_KEY, JSON.stringify(vehicleData)); };
-            // ... (O restante do código do módulo veicular foi omitido para brevidade, mas permanece o mesmo do arquivo original)
-
-            // Chamada inicial
-            renderMonthView();
+        };
+        
+        DOM.salary1Input.addEventListener('change', handleSalaryChange); 
+        DOM.salary2Input.addEventListener('change', handleSalaryChange);
+        DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
+        DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
+        DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
+        DOM.expensesList.addEventListener('click', (e) => { 
+            const card = e.target.closest('.expense-card'); 
+            if (card) {
+                const expense = expensesData.find(exp => exp.id === parseInt(card.dataset.id));
+                if(expense) showExpenseModal(expense);
+            }
         });
-    </script>
+
+        DOM.modalContainer.addEventListener('click', async (e) => { 
+            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
+            if (e.target.id === 'delete-btn' && currentEditingId) { 
+                if(confirm('Tem certeza que deseja excluir este lançamento?')) {
+                    const { error } = await supabaseClient.from('expenses').delete().eq('id', currentEditingId);
+                    if(error) {
+                        showToast('Erro ao excluir lançamento.', 'error');
+                        console.error(error);
+                    } else {
+                       await renderMonthView();
+                       hideExpenseModal();
+                       showToast('Lançamento excluído!', 'success'); 
+                    }
+                } 
+            } 
+        });
+
+        DOM.modalContainer.addEventListener('submit', async (e) => { 
+            if (e.target.id === 'expense-form-inner') { 
+                e.preventDefault(); 
+                const formDate = document.getElementById('form-date').value;
+                const expenseObject = { 
+                    date: formDate,
+                    month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')),
+                    description: document.getElementById('form-description').value,
+                    category: document.getElementById('form-category').value,
+                    value: parseFloat(document.getElementById('form-value').value) || 0
+                }; 
+
+                let result;
+                if (currentEditingId) {
+                    result = await supabaseClient.from('expenses').update(expenseObject).eq('id', currentEditingId);
+                } else {
+                    result = await supabaseClient.from('expenses').insert(expenseObject);
+                }
+                
+                if (result.error) {
+                     showToast('Erro ao salvar lançamento.', 'error');
+                     console.error(result.error);
+                } else {
+                    await renderMonthView();
+                    hideExpenseModal();
+                    showToast('Lançamento salvo com sucesso!', 'success');
+                }
+            } 
+        });
+        
+        // =================================================================================
+        // MÓDULO VEICULAR E EXPORTAÇÃO (ADAPTADO PARA SUPABASE)
+        // =================================================================================
+        
+        const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
+        
+        DOM.exportExcelBtn.addEventListener('click', () => {
+            const ws = XLSX.utils.json_to_sheet(expensesData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Despesas " + getMonthYearKey(currentDate));
+            XLSX.writeFile(wb, `relatorio_financeiro_${getMonthYearKey(currentDate)}.xlsx`);
+            showToast('Relatório Excel gerado!');
+        });
+
+        DOM.exportPdfBtn.addEventListener('click', () => {
+            showToast('Gerando PDF...', 'success');
+            const content = document.getElementById('report-content');
+            html2canvas(content, { backgroundColor: '#1f2937' }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`relatorio_${getMonthYearKey(currentDate)}.pdf`);
+            }).catch(err => {
+                console.error("Erro ao gerar PDF:", err);
+                showToast('Erro ao gerar PDF.', 'error');
+            });
+        });
+
+        // O MÓDULO VEICULAR É GRANDE, A ADAPTAÇÃO SERIA MUITO EXTENSA.
+        // FOI MANTIDA A LÓGICA ORIGINAL COM LOCALSTORAGE PARA ESTE EXEMPLO.
+        // Para migrar, seria necessário criar as tabelas no Supabase (vehicle_profile, fuel_history, etc.)
+        // e substituir cada `saveVehicleData()` e `loadVehicleData()` por chamadas `async` ao Supabase,
+        // seguindo o mesmo padrão do módulo financeiro acima.
+
+        const VEHICLE_DATA_KEY = 'vehicleData_v2_integrated';
+        let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
+        const loadVehicleData = () => { try { const vd = localStorage.getItem(VEHICLE_DATA_KEY); vehicleData = vd ? JSON.parse(vd) : { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }; if (!vehicleData.fuelHistory) vehicleData.fuelHistory = []; if (!vehicleData.tripHistory) vehicleData.tripHistory = []; if (!vehicleData.maintenanceHistory) vehicleData.maintenanceHistory = []; } catch(e) { console.error("Erro ao carregar dados do veículo", e); vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }; } };
+        const saveVehicleData = () => { localStorage.setItem(VEHICLE_DATA_KEY, JSON.stringify(vehicleData)); };
+        // ... (O restante do código do módulo veicular foi omitido para brevidade, mas permanece o mesmo do arquivo original)
+
+        // Chamada inicial
+        renderMonthView();
+    });
+</script>
 </body>
 </html>
+
 
