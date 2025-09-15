@@ -153,15 +153,17 @@
             // =================================================================================
             // CONFIGURAÇÃO SUPABASE
             // =================================================================================
-            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // <-- SUBSTITUA PELA SUA URL
-        	const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
-            const HOUSEHOLD_ID = 'default';                               // <-- personalize seu identificador
+            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co';
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0';
+            const HOUSEHOLD_ID = 'default';
 
-            if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY === 'YOUR_ANON_KEY') {
-              alert('Configure SUPABASE_URL e SUPABASE_ANON_KEY no topo do arquivo.');
+            if (SUPABASE_URL.includes('YOUR-PROJECT')) {
+            alert('Configure a SUPABASE_URL no topo do arquivo.');
+            return;
             }
 
-            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            // Linha Corrigida: Usando SUPABASE_KEY
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
             // =================================================================================
             // CONSTANTES / ESTADO (iguais ao original)
@@ -909,3 +911,4 @@
     </script>
 </body>
 </html>
+
