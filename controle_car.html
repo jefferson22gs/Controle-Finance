@@ -109,7 +109,8 @@
         // CONFIGURAÇÃO DO SUPABASE
         // =================================================================================
         const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // <-- SUBSTITUA PELA SUA URL
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
+
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
         
         if (!SUPABASE_URL || SUPABASE_URL === 'SUA_URL_SUPABASE' || !SUPABASE_KEY || SUPABASE_KEY === 'SUA_CHAVE_ANON_SUPABASE') {
             document.body.innerHTML = `<div class="h-screen flex items-center justify-center text-center text-white"><div class="p-8 bg-red-800 rounded-lg"><h1>Configuração Incompleta</h1><p class="mt-2">Por favor, adicione sua URL e Chave do Supabase no código HTML.</p></div></div>`;
@@ -138,7 +139,9 @@
             addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
             salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
             toast: document.getElementById('toast-notification'),
-            carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
+            carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container'),
+            exportPdfBtn: document.getElementById('export-pdf-btn'),
+            exportExcelBtn: document.getElementById('export-excel-btn')
         };
         
         const formatCurrency = (value) => (value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -224,6 +227,30 @@
         DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
         DOM.expensesList.addEventListener('click', (e) => { const c=e.target.closest('.expense-card'); if(c){ const ex=expensesData.find(e=>e.id===parseInt(c.dataset.id)); if(ex) showExpenseModal(ex); } });
         
+        DOM.exportExcelBtn.addEventListener('click', () => {
+            if (expensesData.length === 0) { showToast('Não há dados para exportar.', 'error'); return; }
+            const ws = XLSX.utils.json_to_sheet(expensesData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Despesas " + getMonthYearKey(currentDate));
+            XLSX.writeFile(wb, `relatorio_financeiro_${getMonthYearKey(currentDate)}.xlsx`);
+            showToast('Relatório Excel gerado!');
+        });
+
+        DOM.exportPdfBtn.addEventListener('click', () => {
+            if (expensesData.length === 0) { showToast('Não há dados para exportar.', 'error'); return; }
+            showToast('Gerando PDF, aguarde...', 'success');
+            const content = document.getElementById('report-content');
+            const originalScroll = content.scrollTop; content.scrollTop = 0;
+            html2canvas(content, { backgroundColor: '#1f2937', scale: 2 }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png'); const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                const pdfWidth = pdf.internal.pageSize.getWidth(); const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save(`relatorio_${getMonthYearKey(currentDate)}.pdf`);
+                content.scrollTop = originalScroll;
+            }).catch(err => { console.error("Erro ao gerar PDF:", err); showToast('Erro ao gerar PDF.', 'error'); content.scrollTop = originalScroll; });
+        });
+
         DOM.modalContainer.addEventListener('click', async (e) => { 
             if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
             if (e.target.id === 'delete-btn' && currentEditingId && confirm('Tem certeza?')) {
@@ -358,9 +385,8 @@
         DOM.carModuleBtn.addEventListener('click', showCarModal);
         
         DOM.carModalContainer.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') {
-                hideCarModal();
-            }
+            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
+            
             const tabBtn = e.target.closest('.tab-btn');
             if (tabBtn) {
                 document.querySelectorAll('#car-tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -430,11 +456,13 @@
             if(submitBtn) submitBtn.disabled = false;
         });
 
+        // Chamada Inicial
         renderMonthView();
     });
 </script>
 </body>
 </html>
+
 
 
 
