@@ -1,36 +1,21 @@
-const CACHE_NAME = 'painel-financeiro-v1';
-// Lista de arquivos que compõem a "casca" do aplicativo
+//
+// COPIE E COLE ESTE BLOCO INTEIRO NO SEU ARQUIVO sw.js
+//
+const CACHE_NAME = 'painel-financeiro-v2';
 const URLS_TO_CACHE = [
+  '/',
   'index.html',
-  'manifest.json',
+  'controle_car.html',
+  'cadastro.html',
+  'recuperar-senha.html',
+  'supabaseClient.js',
   'icon-192.png',
   'icon-512.png',
-  '/',
-  'controle_car.html',
+  'manifest.webmanifest',
   'https://cdn.tailwindcss.com',
   'https://cdn.jsdelivr.net/npm/chart.js',
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
-
-// Arquivo: sw.js
-
-const CACHE_NAME = 'painel-financeiro-v2'; // Mude a versão para forçar a atualização
-const URLS_TO_CACHE = [
-  '/',
-  'index.html', // Adicione explicitamente
-  'controle_car.html',
-  'cadastro.html', // Adicione a página de cadastro
-  'recuperar-senha.html', // Adicione a página de recuperação
-  'supabaseClient.js', // Adicione o cliente supabase
-  'icon-192.png', // Adicione os ícones
-  'icon-512.png', // Adicione os ícones
-  'manifest.webmanifest', // Adicione o manifesto
-  'https://cdn.tailwindcss.com',
-  'https://cdn.jsdelivr.net/npm/chart.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
-];
-
-// O restante do seu arquivo sw.js pode continuar igual...
 
 // Evento de Instalação: Salva os arquivos essenciais no cache
 self.addEventListener('install', event => {
@@ -58,4 +43,3 @@ self.addEventListener('fetch', event => {
       })
   );
 });
-
