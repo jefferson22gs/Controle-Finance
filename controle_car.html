@@ -165,7 +165,7 @@
             // =================================================================================
             const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co';
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0';
-            const HOUSEHOLD_ID = 'default';
+            
 
             if (SUPABASE_URL.includes('YOUR-PROJECT')) {
             alert('Configure a SUPABASE_URL no topo do arquivo.');
@@ -174,6 +174,21 @@
 
             // Linha Corrigida: Usando SUPABASE_KEY
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+			// Adicione este bloco logo após a linha:
+			// const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+			let userId = null; // Variável para guardar o ID do usuário
+
+			// Pega a sessão do usuário para obter o ID
+			const { data: { session } } = await supabase.auth.getSession();
+
+			if (!session) {
+  			// Se não houver sessão (ninguém logado), redireciona para o login
+		 	 window.location.href = 'index.html';
+			} else {
+  			// Se houver, guarda o ID do usuário
+ 		 	userId = session.user.id;
+			}
 
             // =================================================================================
             // CONSTANTES / ESTADO (iguais ao original)
@@ -221,11 +236,14 @@
             // SUPABASE - APP STATE (jsonb)
             // =================================================================================
             async function getAppState() {
-                const { data, error } = await supabase
-                    .from('app_state')
-                    .select('data')
-                    .eq('id', HOUSEHOLD_ID)
-                    .maybeSingle();
+   			 if (!userId) return null; // Não faz nada se não tivermos um ID
+    		const { data, error } = await supabase
+        	.from('app_state')
+       		 .select('data')
+        	.eq('id', userId) // <--- Agora usa o ID do usuário logado
+        	.maybeSingle();
+    		// ... (o resto da função continua igual)
+			};
                 if (error) {
                     console.error('Erro ao buscar app_state:', error);
                     showToast('Erro ao carregar dados do Supabase.', 'error');
@@ -251,10 +269,13 @@
             }
 
             async function saveAppState() {
-                const state = { expensesData, incomeData, vehicleData };
-                const { error } = await supabase
-                    .from('app_state')
-                    .upsert({ id: HOUSEHOLD_ID, data: state });
+    	if (!userId) return; // Não faz nada se não tivermos um ID
+    	const state = { expensesData, incomeData, vehicleData };
+   		 const { error } = await supabase
+        .from('app_state')
+        .upsert({ id: userId, data: state }); // <--- Agora usa o ID do usuário logado
+    	// ... (o resto da função continua igual)
+		}
                 if (error) {
                     console.error('Erro ao salvar app_state:', error);
                     showToast('Erro ao salvar no Supabase.', 'error');
@@ -1056,5 +1077,6 @@
 
 </body>
 </html>
+
 
 
