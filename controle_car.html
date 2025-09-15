@@ -108,8 +108,9 @@
             // =================================================================================
             // CONFIGURAÇÃO DO SUPABASE
             // =================================================================================
-            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co''; // <-- SUBSTITUA PELA SUA URL
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
+            // Exemplo de como deve ficar:
+const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // Sua URL real dentro das aspas
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // Sua chave real dentro das aspas // <-- SUBSTITUA PELA SUA CHAVE ANON
             
             if (!SUPABASE_URL || SUPABASE_URL === 'SUA_URL_SUPABASE' || !SUPABASE_KEY || SUPABASE_KEY === 'SUA_CHAVE_ANON_SUPABASE') {
                 document.body.innerHTML = `<div class="h-screen flex items-center justify-center text-center text-white"><div class="p-8 bg-red-800 rounded-lg"><h1>Configuração Incompleta</h1><p class="mt-2">Por favor, adicione sua URL e Chave do Supabase no código HTML.</p></div></div>`;
@@ -362,3 +363,4 @@
     </script>
 </body>
 </html>
+
