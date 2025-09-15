@@ -28,39 +28,41 @@
             </div>
         </form>
     </div>
-    <script src="supabaseClient.js"></script>
-    <script>
-        const loginForm = document.getElementById('login-form');
-        const messageDiv = document.getElementById('message-div');
-        const loginBtn = document.getElementById('login-btn');
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabaseClient.js"></script>
+<script>
+  const loginForm = document.getElementById("login-form");
+  const messageDiv = document.getElementById("message-div");
 
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            messageDiv.textContent = '';
-            loginBtn.textContent = 'Entrando...';
-            loginBtn.disabled = true;
-            const email = document.getElementById('email-input').value;
-            const password = document.getElementById('password-input').value;
-			const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-			// ...
-			supabaseClient.auth.onAuthStateChange((event, session) => {
-  if (session) {
-    // Usuário logado → redireciona para o painel
-    window.location.href = "controle_car.html";
-  } else {
-    // Usuário deslogado → volta para login
-    console.log("Usuário não autenticado");
-  }
-});
+  // Evento de login
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    messageDiv.textContent = "";
 
+    const email = document.getElementById("email-input").value;
+    const password = document.getElementById("password-input").value;
 
-        supabase.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                window.location.href = 'controle_car.html';
-            }
-        });
-    </script>
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      messageDiv.textContent = "E-mail ou senha inválidos.";
+      messageDiv.className = "text-center text-sm text-red-400 pt-2 h-4";
+    } else {
+      // Login bem-sucedido → redireciona
+      window.location.href = "controle_car.html";
+    }
+  });
+
+  // Monitora mudanças de sessão
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") {
+      window.location.href = "index.html";
+    }
+  });
+</script>
+
 </body>
 
 </html>
+
 
