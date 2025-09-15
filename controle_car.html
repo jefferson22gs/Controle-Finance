@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -138,6 +137,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a4 4 0 100 8 4 4 0 000-8z" clip-rule="evenodd" /><path d="M8 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                         </button>
 
+                        <button id="add-debt-btn" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-5 rounded-lg shadow-md transition-colors duration-200">Add Dívida</button>
                         <button id="add-expense-btn" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg shadow-md transition-colors duration-200">Adicionar</button>
                     </div>
                 </div>
@@ -148,6 +148,7 @@
 
     <div id="expense-modal-container" class="modal-container"></div>
     <div id="car-modal-container" class="modal-container"></div>
+	<div id="debt-modal-container" class="modal-container"></div>
     <div id="toast-notification"></div>
 
     <script>
@@ -188,12 +189,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // =================================================================================
         const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
         const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
-        const CATEGORY_COLORS = { 'Mercado': '#f59e0b', 'Contas': '#10b981', 'Apartamento': '#a855f7', 'Carro': '#3b82f6', 'Lazer': '#ef4444', 'Delivery': '#d946ef', 'Posto': 'orangered', 'Farmácia': '#84cc16', 'Roupa': '#6366f1', 'Escola': '#0ea5e9', 'Cachorro - Pet': '#a16207', 'Poupança Filho': '#ec4899', 'Reserva': '#14b8a6', 'Outros': '#6b7280' };
-
+        const CATEGORY_COLORS = { /* ... */ };
+		
         let expensesData = [];
         let incomeData = {};
         let vehicleData = { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
-
+		let installmentDebts = [];
+		
         let currentDate = new Date();
         let currentEditingId = null;
         window.myExpensesChart = null;
@@ -228,27 +230,37 @@ document.addEventListener('DOMContentLoaded', () => {
         // =================================================================================
         // SUPABASE - APP STATE (jsonb)
         // =================================================================================
+        // =================================================================================
+        // SUPABASE - APP STATE (jsonb) - VERSÃO CORRIGIDA
+        // =================================================================================
         async function getAppState() {
             if (!userId) return null;
+            
             const { data, error } = await supabase
                 .from('app_state')
                 .select('data')
                 .eq('id', userId)
                 .maybeSingle();
+
             if (error) {
                 console.error('Erro ao buscar app_state:', error);
                 showToast('Erro ao carregar dados do Supabase.', 'error');
                 return null;
             }
+
+            // Se não encontrar dados para este usuário, cria um registro inicial
             if (!data) {
                 const initial = {
                     expensesData: [],
                     incomeData: {},
-                    vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] }
+                    vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] },
+                    installmentDebts: []
                 };
+                
                 const { error: insertErr } = await supabase
                     .from('app_state')
                     .insert({ id: userId, data: initial });
+
                 if (insertErr) {
                     console.error('Erro ao inicializar app_state:', insertErr);
                     showToast('Erro ao inicializar dados no Supabase.', 'error');
@@ -256,19 +268,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 return initial;
             }
-            return data.data || { expensesData: [], incomeData: {}, vehicleData: { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] } };
+            
+            // Se encontrou dados, retorna garantindo que todos os campos existam
+            const existingData = data.data || {};
+            return {
+                expensesData: existingData.expensesData || [],
+                incomeData: existingData.incomeData || {},
+                vehicleData: existingData.vehicleData || { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] },
+                installmentDebts: existingData.installmentDebts || []
+            };
         }
 
         async function saveAppState() {
             if (!userId) return;
-            const state = { expensesData, incomeData, vehicleData };
+            const state = { expensesData, incomeData, vehicleData, installmentDebts }; // <<< ADICIONE AQUI
             const { error } = await supabase
                 .from('app_state')
                 .upsert({ id: userId, data: state });
-            if (error) {
-                console.error('Erro ao salvar app_state:', error);
-                showToast('Erro ao salvar no Supabase.', 'error');
-            }
+            // ...
+        }
+		const initial = await getAppState();
+        if (initial) {
+            expensesData = Array.isArray(initial.expensesData) ? initial.expensesData : [];
+            incomeData = initial.incomeData || {};
+            vehicleData = initial.vehicleData || { /* ... */ };
+            installmentDebts = Array.isArray(initial.installmentDebts) ? initial.installmentDebts : []; // <<< ADICIONE ESTA LINHA
+        }
+        renderMonthView();
         }
 
         // =================================================================================
@@ -361,25 +387,63 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const renderExpenseList = (expenses) => {
-            if (expenses.length === 0) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            // Pega as parcelas PENDENTES para o mês atual
+            const pendingInstallments = installmentDebts.flatMap(debt =>
+                debt.installments.filter(inst => {
+                    const dueDate = new Date(inst.dueDate + 'T12:00:00');
+                    return inst.status === 'pending' &&
+                           dueDate.getFullYear() === year &&
+                           dueDate.getMonth() === month;
+                }).map(inst => ({...inst, debtDetails: debt})) // Adiciona detalhes da dívida pai
+            );
+
+            // Combina despesas pagas com parcelas pendentes
+            const allItems = [
+                ...expenses.map(exp => ({...exp, type: 'expense'})), 
+                ...pendingInstallments.map(inst => ({...inst, type: 'installment'}))
+            ].sort((a, b) => new Date(b.date || b.dueDate) - new Date(a.date || a.dueDate));
+
+            if (allItems.length === 0) {
                 DOM.expensesList.innerHTML = `
                     <div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color">
                         <h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3>
-                        <p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p>
+                        <p class="mt-1 text-text-secondary">Adicione despesas ou dívidas para começar.</p>
                     </div>`;
                 return;
             }
-            DOM.expensesList.innerHTML = expenses.map(exp => `
-                <div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}">
-                    <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20">
-                        <span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span>
-                    </div>
-                    <div class="flex-grow">
-                        <p class="font-semibold">${exp.description}</p>
-                        <p class="text-sm text-text-secondary">${new Date(exp.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
-                    </div>
-                    <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
-                </div>`).join('');
+
+            DOM.expensesList.innerHTML = allItems.map(item => {
+                if (item.type === 'installment') {
+                    // Renderiza uma parcela pendente
+                    return `
+                    <div class="expense-card p-4 flex items-center gap-4 opacity-75 border-l-4 border-yellow-500" data-debt-id="${item.debtDetails.id}" data-inst-num="${item.installmentNumber}" style="cursor: pointer;">
+                        <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-yellow-500/10">
+                           <span class="text-xl">📅</span>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="font-semibold">${item.debtDetails.description} <span class="text-xs font-normal text-gray-400">(${item.installmentNumber}/${item.debtDetails.installmentsTotal})</span></p>
+                            <p class="text-sm text-yellow-400">A vencer em ${new Date(item.dueDate + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                        </div>
+                        <p class="font-bold text-lg text-yellow-400">${formatCurrency(item.value)}</p>
+                    </div>`;
+                } else {
+                    // Renderiza uma despesa normal (já paga)
+                    return `
+                    <div class="expense-card p-4 flex items-center gap-4" data-id="${item.id}">
+                        <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[item.category]}20">
+                            <span class="text-xl">${CATEGORY_ICONS[item.category] || '📎'}</span>
+                        </div>
+                        <div class="flex-grow">
+                            <p class="font-semibold">${item.description}</p>
+                            <p class="text-sm text-text-secondary">${new Date(item.date + 'T12:00:00').toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
+                        </div>
+                        <p class="font-bold text-lg">${formatCurrency(item.value)}</p>
+                    </div>`;
+                }
+            }).join('');
         };
 
         // =================================================================================
@@ -426,6 +490,146 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         // =================================================================================
+        // LÓGICA DA MODAL DE DÍVIDAS (NOVO E CORRIGIDO)
+        // =================================================================================
+        const showDebtModal = () => {
+            const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            const modalHTML = `
+                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
+                    <form id="debt-form-inner">
+                        <div class="flex justify-between items-center p-5 border-b border-border-color">
+                            <h3 class="text-xl font-display">Adicionar Dívida Parcelada</h3>
+                            <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div class="sm:col-span-2"><label class="block text-sm font-medium">Descrição</label><input type="text" id="debt-description" placeholder="Ex: IPTU 2025" class="form-input w-full mt-1" required></div>
+                            <div><label class="block text-sm font-medium">Valor Total (R$)</label><input type="number" step="0.01" id="debt-total-value" placeholder="1200.00" class="form-input w-full mt-1" required></div>
+                            <div><label class="block text-sm font-medium">Nº de Parcelas</label><input type="number" id="debt-installments-total" placeholder="10" class="form-input w-full mt-1" required></div>
+                            <div><label class="block text-sm font-medium">Venc. 1ª Parcela</label><input type="date" id="debt-start-date" class="form-input w-full mt-1" required value="${toISODateString(new Date())}"></div>
+                            <div><label class="block text-sm font-medium">Categoria</label><select id="debt-category" class="form-select w-full mt-1" required>${categoryOptions}</select></div>
+                             <div class="sm:col-span-2"><label class="block text-sm font-medium">Tipo de Baixa</label>
+                                <select id="debt-payment-type" class="form-select w-full mt-1">
+                                    <option value="automatic">Automática no Vencimento</option>
+                                    <option value="manual">Apenas Manual</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex justify-end p-4 bg-background-color rounded-b-xl gap-4">
+                            <button type="button" class="modal-close-btn-debt bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button>
+                            <button type="submit" class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg">Salvar Dívida</button>
+                        </div>
+                    </form>
+                </div>`;
+
+            const debtModalContainer = document.getElementById('debt-modal-container');
+            debtModalContainer.innerHTML = modalHTML;
+            DOM.mainContainer.classList.add('modal-open');
+            debtModalContainer.classList.add('visible');
+
+            debtModalContainer.querySelector('.modal-close-btn-debt').addEventListener('click', hideDebtModal);
+            debtModalContainer.querySelector('#debt-form-inner').addEventListener('submit', handleDebtFormSubmit);
+        };
+
+        const hideDebtModal = () => {
+            const debtModalContainer = document.getElementById('debt-modal-container');
+            DOM.mainContainer.classList.remove('modal-open');
+            debtModalContainer.classList.remove('visible');
+            setTimeout(() => { debtModalContainer.innerHTML = ''; }, 300);
+        };
+        
+        const handleDebtFormSubmit = async (e) => {
+            e.preventDefault();
+            
+            const newDebt = {
+                id: `debt_${Date.now()}`,
+                description: document.getElementById('debt-description').value,
+                totalValue: parseFloat(document.getElementById('debt-total-value').value),
+                installmentsTotal: parseInt(document.getElementById('debt-installments-total').value),
+                startDate: document.getElementById('debt-start-date').value,
+                category: document.getElementById('debt-category').value,
+                paymentType: document.getElementById('debt-payment-type').value,
+                installments: []
+            };
+
+            const installmentValue = newDebt.totalValue / newDebt.installmentsTotal;
+            const startDate = new Date(newDebt.startDate + 'T12:00:00');
+
+            for (let i = 1; i <= newDebt.installmentsTotal; i++) {
+                const dueDate = new Date(startDate);
+                dueDate.setMonth(startDate.getMonth() + (i - 1));
+                newDebt.installments.push({
+                    installmentNumber: i,
+                    dueDate: toISODateString(dueDate),
+                    value: installmentValue,
+                    status: 'pending'
+                });
+            }
+            
+            installmentDebts.push(newDebt);
+            await saveAppState();
+            hideDebtModal();
+            renderMonthView();
+            showToast('Dívida parcelada adicionada com sucesso!', 'success');
+        };
+
+        // =================================================================================
+        // LÓGICA DE BAIXA AUTOMÁTICA (NOVO)
+        // =================================================================================
+        const processAutomaticSettlements = async () => {
+            const today = new Date();
+            let dataWasChanged = false;
+
+            installmentDebts.forEach(debt => {
+                if (debt.paymentType === 'automatic') {
+                    debt.installments.forEach(inst => {
+                        const dueDate = new Date(inst.dueDate + 'T12:00:00');
+                        if (inst.status === 'pending' && dueDate <= today) {
+                            inst.status = 'paid';
+                            expensesData.push({
+                                id: `inst_${debt.id}_${inst.installmentNumber}`,
+                                date: inst.dueDate,
+                                description: `${debt.description} (${inst.installmentNumber}/${debt.installmentsTotal})`,
+                                category: debt.category,
+                                value: inst.value
+                            });
+                            dataWasChanged = true;
+                        }
+                    });
+                }
+            });
+
+            if (dataWasChanged) {
+                await saveAppState();
+            }
+        };
+
+            const installmentValue = newDebt.totalValue / newDebt.installmentsTotal;
+            const startDate = new Date(newDebt.startDate + 'T12:00:00'); // Adiciona tempo para evitar problemas de fuso
+
+            for (let i = 1; i <= newDebt.installmentsTotal; i++) {
+                const dueDate = new Date(startDate);
+                dueDate.setMonth(startDate.getMonth() + (i - 1));
+
+                newDebt.installments.push({
+                    installmentNumber: i,
+                    dueDate: toISODateString(dueDate),
+                    value: installmentValue,
+                    status: 'pending'
+                });
+            }
+            
+            installmentDebts.push(newDebt);
+            await saveAppState();
+            hideDebtModal();
+            renderMonthView(); // Atualiza a tela para mostrar a nova dívida
+            showToast('Dívida parcelada adicionada com sucesso!', 'success');
+        };
+
+        // Adicionar o listener para o novo botão
+        document.getElementById('add-debt-btn').addEventListener('click', showDebtModal);
+        };
+
+        // =================================================================================
         // EVENTOS
         // =================================================================================
         const handleSalaryChange = async () => {
@@ -443,25 +647,41 @@ document.addEventListener('DOMContentLoaded', () => {
         DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
         DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
         DOM.expensesList.addEventListener('click', (e) => {
-            const card = e.target.closest('.expense-card');
-            if (card) {
-                const expense = expensesData.find(exp => String(exp.id) === String(card.dataset.id));
+            const expenseCard = e.target.closest('.expense-card[data-id]');
+            const installmentCard = e.target.closest('.expense-card[data-debt-id]');
+
+            if (expenseCard) {
+                const expense = expensesData.find(exp => String(exp.id) === String(expenseCard.dataset.id));
                 if (expense) showExpenseModal(expense);
+            } else if (installmentCard) {
+                const debtId = installmentCard.dataset.debtId;
+                const instNum = parseInt(installmentCard.dataset.instNum);
+                handleManualSettlement(debtId, instNum);
             }
         });
 
-        DOM.modalContainer.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
+        const handleManualSettlement = async (debtId, instNum) => {
+            const debt = installmentDebts.find(d => d.id === debtId);
+            if (!debt) return;
+            const installment = debt.installments.find(i => i.installmentNumber === instNum);
+            if (!installment || installment.status !== 'pending') return;
 
-            if (e.target.id === 'delete-btn' && currentEditingId) {
-                if (confirm('Tem certeza que deseja excluir este lançamento?')) {
-                    expensesData = expensesData.filter(exp => String(exp.id) !== String(currentEditingId));
-                    await saveAppState();
-                    renderMonthView();
-                    hideExpenseModal();
-                    showToast('Lançamento excluído!', 'success');
-                }
+            const confirmation = confirm(`Deseja dar baixa manual na parcela ${instNum}/${debt.installmentsTotal} de "${debt.description}" no valor de ${formatCurrency(installment.value)}?`);
+
+            if (confirmation) {
+                installment.status = 'paid';
+                expensesData.push({
+                    id: `inst_${debt.id}_${installment.installmentNumber}`,
+                    date: installment.dueDate,
+                    description: `${debt.description} (${installment.installmentNumber}/${debt.installmentsTotal})`,
+                    category: debt.category,
+                    value: installment.value
+                });
+                await saveAppState();
+                renderMonthView();
+                showToast('Baixa manual realizada com sucesso!', 'success');
             }
+        };
         });
 
         DOM.modalContainer.addEventListener('submit', async (e) => {
@@ -1011,7 +1231,11 @@ document.addEventListener('DOMContentLoaded', () => {
             expensesData = Array.isArray(initial.expensesData) ? initial.expensesData : [];
             incomeData = initial.incomeData || {};
             vehicleData = initial.vehicleData || { profile: {}, fuelHistory: [], tripHistory: [], maintenanceHistory: [] };
+            installmentDebts = Array.isArray(initial.installmentDebts) ? initial.installmentDebts : [];
         }
+
+        await processAutomaticSettlements(); // <<< CHAME A FUNÇÃO AQUI
+
         renderMonthView();
         
     })();
@@ -1052,6 +1276,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 </body>
 </html>
-
 
 
