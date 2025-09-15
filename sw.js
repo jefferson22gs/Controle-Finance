@@ -12,6 +12,26 @@ const URLS_TO_CACHE = [
   'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
 
+// Arquivo: sw.js
+
+const CACHE_NAME = 'painel-financeiro-v2'; // Mude a versão para forçar a atualização
+const URLS_TO_CACHE = [
+  '/',
+  'index.html', // Adicione explicitamente
+  'controle_car.html',
+  'cadastro.html', // Adicione a página de cadastro
+  'recuperar-senha.html', // Adicione a página de recuperação
+  'supabaseClient.js', // Adicione o cliente supabase
+  'icon-192.png', // Adicione os ícones
+  'icon-512.png', // Adicione os ícones
+  'manifest.webmanifest', // Adicione o manifesto
+  'https://cdn.tailwindcss.com',
+  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+];
+
+// O restante do seu arquivo sw.js pode continuar igual...
+
 // Evento de Instalação: Salva os arquivos essenciais no cache
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -38,3 +58,4 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+
