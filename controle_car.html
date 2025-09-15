@@ -858,30 +858,46 @@
             };
 
             const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-                if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY === 'SUA_CHAVE_API_DA_TOLLGURU_AQUI') {
+                // Validações iniciais (Chaves, Consumo, etc.)
+                if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY.includes('SUA_CHAVE')) {
                     showToast('Chave da API TollGuru não configurada.', 'error'); return;
+                }
+                if (!MAPBOX_ACCESS_TOKEN || MAPBOX_ACCESS_TOKEN.includes('SEU_ACCESS_TOKEN')) {
+                    showToast('Access Token do Mapbox não configurado.', 'error'); return;
                 }
                 const consumption = calculateAverageConsumption();
                 if (consumption <= 0) {
                     showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
                 }
+                
                 const resultDiv = document.getElementById('trip-result');
                 resultDiv.classList.remove('hidden');
-                resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
+                resultDiv.innerHTML = `<p class="text-center p-4">Geocodificando endereços...</p>`;
+
+                // --- ETAPA 1: Converter endereços para coordenadas usando Mapbox ---
+                const getCoords = async (address) => {
+                    const formattedAddress = address.replace(/--/g, ', ');
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(formattedAddress)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1&country=BR`;
+                    
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    
+                    if (!data.features || data.features.length === 0) {
+                        throw new Error(`Endereço não encontrado: ${address}`);
+                    }
+                    // Mapbox retorna [longitude, latitude]
+                    return data.features[0].center; 
+                };
 
                 try {
-                    // Normaliza o formato dos endereços antes de enviar para a API
-                    const formattedOrigin = origin.replace(/--/g, ', ');
-                    const formattedDestination = destination.replace(/--/g, ', ');
+                    const [originCoords, destCoords] = await Promise.all([
+                        getCoords(origin),
+                        getCoords(destination)
+                    ]);
                     
-                    // ================================================================
-                    // PASSO DE VERIFICAÇÃO: Ver no console o que será enviado
-                    console.log("Enviando para a API TollGuru:", { 
-                        origin: formattedOrigin, 
-                        destination: formattedDestination 
-                    });
-                    // ================================================================
+                    resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
+                    // --- ETAPA 2: Enviar coordenadas para a TollGuru ---
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
                     const response = await fetch(apiUrl, {
                         method: 'POST',
@@ -890,16 +906,16 @@
                             'x-api-key': TOLLGURU_API_KEY
                         },
                         body: JSON.stringify({
-                            // Usa as variáveis formatadas
-                            from: { address: formattedOrigin },
-                            to: { address: formattedDestination },
+                            // Conforme a documentação, enviamos lat/lng
+                            from: { lat: originCoords[1], lng: originCoords[0] },
+                            to: { lat: destCoords[1], lng: destCoords[0] },
                             vehicle: {
                                 type: vehicleType,
                                 fuelPrice: fuelPrice,
                                 fuelPriceCurrency: "BRL",
                                 fuelEfficiency: {
                                     city: consumption,
-                                    hwy: consumption, // Usamos o mesmo para simplificar
+                                    hwy: consumption,
                                     units: "km/L"
                                 }
                             }
@@ -908,17 +924,13 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        const errorMessage = errorData?.message || `Erro HTTP: ${response.status}`;
-                        throw new Error(errorMessage);
+                        throw new Error(errorData.message || `Erro HTTP: ${response.status}`);
                     }
 
                     const data = await response.json();
 
                     if (data.status !== 'OK' || !data.route) {
-                        if (data.message) {
-                           throw new Error(data.message);
-                        }
-                        throw new Error('Não foi possível calcular a rota com pedágios.');
+                        throw new Error(data.message || 'Não foi possível calcular a rota com pedágios.');
                     }
                     
                     const route = data.route;
@@ -930,7 +942,7 @@
 
                     resultDiv.innerHTML = `
                         <div class="p-4 rounded-lg bg-background-color border border-border-color">
-                            <h5 class="font-bold text-lg mb-3">Resultado da Rota (via TollGuru)</h5>
+                            <h5 class="font-bold text-lg mb-3">Resultado da Rota (Custo Total Estimado)</h5>
                             <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
                                 <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
                                 <div><p class="text-sm text-text-secondary">Duração</p><p class="font-bold text-xl">${durationText}</p></div>
@@ -943,9 +955,9 @@
                         </div>`;
 
                 } catch (error) {
-                    console.error("Erro na API TollGuru:", error);
+                    console.error("Erro no processo de cálculo da rota:", error);
                     resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
-                    showToast('Erro ao calcular a rota com pedágios.', 'error');
+                    showToast(error.message, 'error');
                 }
             };
             DOM.carModuleBtn.addEventListener('click', showCarModal);
@@ -1073,6 +1085,7 @@
     </script>
 </body>
 </html>
+
 
 
 
