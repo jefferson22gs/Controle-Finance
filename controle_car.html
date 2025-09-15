@@ -870,6 +870,13 @@
                 resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
                 try {
+                    // ================================================================
+                    // CORREÇÃO APLICADA AQUI
+                    // Normaliza o formato dos endereços antes de enviar para a API
+                    const formattedOrigin = origin.replace(/--/g, ', ');
+                    const formattedDestination = destination.replace(/--/g, ', ');
+                    // ================================================================
+
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
                     const response = await fetch(apiUrl, {
                         method: 'POST',
@@ -878,8 +885,9 @@
                             'x-api-key': TOLLGURU_API_KEY
                         },
                         body: JSON.stringify({
-                            from: { address: origin },
-                            to: { address: destination },
+                            // Usa as variáveis formatadas
+                            from: { address: formattedOrigin },
+                            to: { address: formattedDestination },
                             vehicle: {
                                 type: vehicleType,
                                 fuelPrice: fuelPrice,
@@ -895,13 +903,19 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        throw new Error(errorData.message || `Erro HTTP: ${response.status}`);
+                        // Tenta extrair uma mensagem de erro mais específica da TollGuru
+                        const errorMessage = errorData?.message || `Erro HTTP: ${response.status}`;
+                        throw new Error(errorMessage);
                     }
 
                     const data = await response.json();
 
                     if (data.status !== 'OK' || !data.route) {
-                        throw new Error(data.message || 'Não foi possível calcular a rota com pedágios.');
+                        // Se a API retornar um erro conhecido (ex: endereço não encontrado)
+                        if (data.message) {
+                           throw new Error(data.message);
+                        }
+                        throw new Error('Não foi possível calcular a rota com pedágios.');
                     }
                     
                     const route = data.route;
@@ -1057,6 +1071,7 @@
     </script>
 </body>
 </html>
+
 
 
 
