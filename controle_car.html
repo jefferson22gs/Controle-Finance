@@ -151,16 +151,24 @@
             const monthKey = getMonthYearKey(currentDate);
             DOM.monthHeader.textContent = new Date(currentDate).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
             showLoading(DOM.expensesList);
-            const [{data: expenses, error: expError}, {data: income, error: incError}] = await Promise.all([
+
+            const [expensesRes, incomeRes] = await Promise.all([
                 supabaseClient.from('expenses').select('*').eq('month_key', monthKey).order('date', { ascending: false }),
                 supabaseClient.from('income').select('*').eq('month_key', monthKey).single()
             ]);
+
+            const { data: expenses, error: expError } = expensesRes;
+            const { data: income, error: incError } = incomeRes;
+
             if (expError) { console.error('Erro ao buscar despesas:', expError.message); showToast('Erro ao buscar despesas.', 'error'); return; }
             if (incError && incError.code !== 'PGRST116') { console.error('Erro ao buscar renda:', incError.message); showToast('Erro ao buscar renda.', 'error'); }
+            
             expensesData = expenses || []; 
             incomeData = income || { salary1: '', salary2: '' };
+            
             DOM.salary1Input.value = incomeData.salary1 || ''; 
             DOM.salary2Input.value = incomeData.salary2 || '';
+            
             renderSummary(); 
             renderExpenseList();
         };
@@ -199,16 +207,48 @@
             DOM.mainContainer.classList.add('modal-open'); DOM.modalContainer.classList.add('visible'); DOM.body.classList.add('modal-open-body');
             setTimeout(() => document.getElementById('form-description').focus(), 50);
         };
+
         const hideExpenseModal = () => { DOM.mainContainer.classList.remove('modal-open'); DOM.modalContainer.classList.remove('visible'); DOM.body.classList.remove('modal-open-body'); setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300); };
-        const handleSalaryChange = async () => { /* ... */ };
+        
+        const handleSalaryChange = async () => { 
+            const monthKey = getMonthYearKey(currentDate);
+            const newIncome = { month_key: monthKey, salary1: DOM.salary1Input.value || null, salary2: DOM.salary2Input.value || null };
+            const { error } = await supabaseClient.from('income').upsert(newIncome, { onConflict: 'month_key' });
+            if (error) { console.error("Erro ao salvar renda:", error); showToast('Erro ao salvar renda.', 'error'); } 
+            else { incomeData = newIncome; renderSummary(); }
+        };
         
         DOM.salary1Input.addEventListener('change', handleSalaryChange);
         DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
         DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
         DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
-        DOM.expensesList.addEventListener('click', (e) => { /* ... */ });
-        DOM.modalContainer.addEventListener('click', async (e) => { /* ... */ });
-        DOM.modalContainer.addEventListener('submit', async (e) => { /* ... */ });
+        DOM.expensesList.addEventListener('click', (e) => { const c=e.target.closest('.expense-card'); if(c){ const ex=expensesData.find(e=>e.id===parseInt(c.dataset.id)); if(ex) showExpenseModal(ex); } });
+        
+        DOM.modalContainer.addEventListener('click', async (e) => { 
+            if (e.target.classList.contains('modal-close-btn') || e.target.id === 'expense-modal-container') hideExpenseModal();
+            if (e.target.id === 'delete-btn' && currentEditingId && confirm('Tem certeza?')) {
+                const { error } = await supabaseClient.from('expenses').delete().eq('id', currentEditingId);
+                if (error) { showToast('Erro ao excluir.', 'error'); console.error(error); } 
+                else { await renderMonthView(); hideExpenseModal(); showToast('Excluído com sucesso!'); }
+            }
+        });
+
+        DOM.modalContainer.addEventListener('submit', async (e) => { 
+            if (e.target.id === 'expense-form-inner') {
+                e.preventDefault();
+                const formDate = document.getElementById('form-date').value;
+                const expenseObject = { 
+                    date: formDate, month_key: getMonthYearKey(new Date(formDate + 'T03:00:00Z')), 
+                    description: document.getElementById('form-description').value, category: document.getElementById('form-category').value, 
+                    value: parseFloat(document.getElementById('form-value').value) || 0
+                }; 
+                const { error } = currentEditingId 
+                    ? await supabaseClient.from('expenses').update(expenseObject).eq('id', currentEditingId) 
+                    : await supabaseClient.from('expenses').insert(expenseObject);
+                if (error) { showToast('Erro ao salvar.', 'error'); console.error(error); } 
+                else { await renderMonthView(); hideExpenseModal(); showToast('Salvo com sucesso!'); }
+            }
+        });
 
         // =================================================================================
         // MÓDULO DE VEÍCULO INTEGRADO COM SUPABASE
@@ -249,11 +289,7 @@
         
         const getLatestOdometer = () => {
             const p = vehicleData.profile || {};
-            const allKms = [
-                ...(vehicleData.fuelHistory || []).map(f => f.odometer),
-                ...(vehicleData.maintenanceHistory || []).map(m => m.last_service_km),
-                p.last_oil_change_km || 0
-            ];
+            const allKms = [...(vehicleData.fuelHistory || []).map(f => f.odometer), ...(vehicleData.maintenanceHistory || []).map(m => m.last_service_km), p.last_oil_change_km || 0];
             return Math.max(...allKms, 0);
         };
         const calculateAverageConsumption = () => {
@@ -359,9 +395,17 @@
             if(submitBtn) submitBtn.disabled = true;
 
             if (form.id === 'car-profile-form') {
-                const profileData = { id: vehicleData.profile?.id || 1, model: form.querySelector('#car-model').value, plate: form.querySelector('#car-plate').value, oil_change_km_interval: parseInt(form.querySelector('#car-oil-interval').value), last_oil_change_km: parseInt(form.querySelector('#car-last-oil').value) };
-                const { error } = await supabaseClient.from('vehicle_profile').upsert(profileData, { onConflict: 'id' });
-                if (error) { showToast('Erro ao salvar perfil.', 'error'); console.error(error); } else { showToast('Perfil salvo!'); await loadVehicleData(); renderCarTab('profile'); }
+                const profileData = { model: form.querySelector('#car-model').value, plate: form.querySelector('#car-plate').value, oil_change_km_interval: parseInt(form.querySelector('#car-oil-interval').value), last_oil_change_km: parseInt(form.querySelector('#car-last-oil').value) };
+                let error;
+                if (vehicleData.profile && vehicleData.profile.id) {
+                    const { error: updateError } = await supabaseClient.from('vehicle_profile').update(profileData).eq('id', vehicleData.profile.id);
+                    error = updateError;
+                } else {
+                    const { error: insertError } = await supabaseClient.from('vehicle_profile').insert(profileData);
+                    error = insertError;
+                }
+                if (error) { showToast('Erro ao salvar perfil.', 'error'); console.error(error); } 
+                else { showToast('Perfil salvo com sucesso!'); await loadVehicleData(); renderCarTab('profile'); }
             }
             if (form.id === 'fuel-log-form') {
                 const fuelData = { date: form.querySelector('#fuel-date').value, odometer: parseInt(form.querySelector('#fuel-odometer').value), liters: parseFloat(form.querySelector('#fuel-liters').value), total_value: parseFloat(form.querySelector('#fuel-total-value').value) };
@@ -386,12 +430,12 @@
             if(submitBtn) submitBtn.disabled = false;
         });
 
-        // Chamada Inicial
         renderMonthView();
     });
 </script>
 </body>
 </html>
+
 
 
 
