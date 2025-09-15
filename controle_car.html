@@ -870,11 +870,16 @@
                 resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
 
                 try {
-                    // ================================================================
-                    // CORREÇÃO APLICADA AQUI
                     // Normaliza o formato dos endereços antes de enviar para a API
                     const formattedOrigin = origin.replace(/--/g, ', ');
                     const formattedDestination = destination.replace(/--/g, ', ');
+                    
+                    // ================================================================
+                    // PASSO DE VERIFICAÇÃO: Ver no console o que será enviado
+                    console.log("Enviando para a API TollGuru:", { 
+                        origin: formattedOrigin, 
+                        destination: formattedDestination 
+                    });
                     // ================================================================
 
                     const apiUrl = 'https://api.tollguru.com/v1/calc/route';
@@ -903,7 +908,6 @@
 
                     if (!response.ok) {
                         const errorData = await response.json();
-                        // Tenta extrair uma mensagem de erro mais específica da TollGuru
                         const errorMessage = errorData?.message || `Erro HTTP: ${response.status}`;
                         throw new Error(errorMessage);
                     }
@@ -911,7 +915,6 @@
                     const data = await response.json();
 
                     if (data.status !== 'OK' || !data.route) {
-                        // Se a API retornar um erro conhecido (ex: endereço não encontrado)
                         if (data.message) {
                            throw new Error(data.message);
                         }
@@ -919,8 +922,8 @@
                     }
                     
                     const route = data.route;
-                    const distanceInKm = route.distance.value; // Já vem em KM
-                    const durationText = formatDuration(route.duration.value); // Já vem em segundos
+                    const distanceInKm = route.distance.value;
+                    const durationText = formatDuration(route.duration.value);
                     const tollCost = route.costs.toll || 0;
                     const fuelCost = route.costs.fuel || 0;
                     const totalCost = tollCost + fuelCost;
@@ -945,7 +948,6 @@
                     showToast('Erro ao calcular a rota com pedágios.', 'error');
                 }
             };
-
             DOM.carModuleBtn.addEventListener('click', showCarModal);
 
             DOM.carModalContainer.addEventListener('click', async e => {
@@ -1071,6 +1073,7 @@
     </script>
 </body>
 </html>
+
 
 
 
