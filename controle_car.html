@@ -489,6 +489,108 @@
                     showToast('Falha ao exportar backup.', 'error');
                 }
             });
+            // ... (código existente do exportJsonBtn) ...
+
+            // ADICIONAR ESTE BLOCO PARA EXPORTAR PDF
+            DOM.exportPdfBtn.addEventListener('click', () => {
+                showToast('Gerando PDF, por favor aguarde...');
+                const reportContent = document.getElementById('report-content'); // O elemento que queremos imprimir
+                const originalStyles = reportContent.style.transform;
+                reportContent.style.transform = 'scale(1)'; // Garante a escala correta
+
+                html2canvas(reportContent, {
+                    scale: 2, // Aumenta a resolução da imagem
+                    useCORS: true,
+                    backgroundColor: '#1f2937' // Cor de fundo do card
+                }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    
+                    // A4 page size: 210mm x 297mm. 
+                    // A proporção da imagem precisa caber nisso.
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const ratio = canvasWidth / canvasHeight;
+                    
+                    let imgWidth = pdfWidth - 20; // com margens
+                    let imgHeight = imgWidth / ratio;
+
+                    // Se a altura for maior que a página, recalcula com base na altura
+                    if (imgHeight > pdfHeight - 20) {
+                        imgHeight = pdfHeight - 20;
+                        imgWidth = imgHeight * ratio;
+                    }
+                    
+                    const x = (pdfWidth - imgWidth) / 2;
+                    const y = 10; // Margem superior
+
+                    pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
+                    pdf.save(`relatorio_financeiro_${getMonthYearKey(currentDate)}.pdf`);
+                    reportContent.style.transform = originalStyles; // Restaura o estilo
+                    showToast('PDF exportado com sucesso!');
+                }).catch(err => {
+                    console.error('Erro ao gerar PDF:', err);
+                    showToast('Falha ao gerar o PDF.', 'error');
+                    reportContent.style.transform = originalStyles;
+                });
+            });
+
+            // ADICIONAR ESTE BLOCO PARA EXPORTAR EXCEL
+            DOM.exportExcelBtn.addEventListener('click', () => {
+                try {
+                    const monthKey = getMonthYearKey(currentDate);
+                    const monthExpenses = expensesData.filter(e => getMonthYearKey(new Date(e.date)) === monthKey);
+
+                    if (monthExpenses.length === 0) {
+                        showToast('Não há dados para exportar neste mês.', 'warning');
+                        return;
+                    }
+
+                    // Prepara os dados para a planilha
+                    const dataToExport = monthExpenses.map(exp => ({
+                        'Data': new Date(exp.date).toLocaleDateString('pt-BR'),
+                        'Descrição': exp.description,
+                        'Categoria': exp.category,
+                        'Valor': exp.value
+                    }));
+
+                    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, 'Despesas');
+
+                    // Formata as colunas
+                    worksheet['!cols'] = [
+                        { wch: 12 }, // Data
+                        { wch: 40 }, // Descrição
+                        { wch: 20 }, // Categoria
+                        { wch: 15 }  // Valor
+                    ];
+                    // Formata a coluna de valor como moeda
+                    dataToExport.forEach((_data, index) => {
+                        const cellRef = XLSX.utils.encode_cell({c: 3, r: index + 1});
+                        worksheet[cellRef].t = 'n';
+                        worksheet[cellRef].z = 'R$ #,##0.00';
+                    });
+
+
+                    XLSX.writeFile(workbook, `despesas_${monthKey}.xlsx`);
+                    showToast('Excel exportado com sucesso!');
+
+                } catch (err) {
+                    console.error('Erro ao gerar Excel:', err);
+                    showToast('Falha ao gerar o Excel.', 'error');
+                }
+            });
+
+            // ... (código existente do importInput) ...
 
             DOM.importInput.addEventListener('change', async (e) => {
                 const file = e.target.files?.[0];
@@ -912,4 +1014,5 @@
     </script>
 </body>
 </html>
+
 
