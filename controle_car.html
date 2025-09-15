@@ -857,98 +857,7 @@
                 return str.trim() || '0min';
             };
 
-           const calculateTripWithTolls = async (origin, destination, fuelPrice, vehicleType) => {
-                if (!TOLLGURU_API_KEY || TOLLGURU_API_KEY === 'SUA_CHAVE_API_DA_TOLLGURU_AQUI') {
-                    showToast('Chave da API TollGuru não configurada.', 'error'); return;
-                }
-                const consumption = calculateAverageConsumption();
-                if (consumption <= 0) {
-                    showToast('Registre ao menos 2 abastecimentos para calcular o consumo.', 'error'); return;
-                }
-                const resultDiv = document.getElementById('trip-result');
-                resultDiv.classList.remove('hidden');
-                resultDiv.innerHTML = `<p class="text-center p-4">Calculando rota e pedágios...</p>`;
-
-                try {
-                    // ===================================================================================
-                    // LÓGICA FINAL E CORRETA:
-                    // Troca '--' por ',' e adiciona 'Brazil' para dar contexto ao país, sem assumir o estado.
-                    // Ex: 'São Paulo--SP' vira 'São Paulo, SP, Brazil'
-                    // Ex: 'Rio de Janeiro--RJ' vira 'Rio de Janeiro, RJ, Brazil'
-                    const finalOrigin = `${origin.replace(/--/g, ', ')}, Brazil`;
-                    const finalDestination = `${destination.replace(/--/g, ', ')}, Brazil`;
-                    // ===================================================================================
-
-                    console.log("Enviando endereço final para a API:", { 
-                        origin: finalOrigin, 
-                        destination: finalDestination 
-                    });
-
-                    const apiUrl = 'https://api.tollguru.com/v1/calc/route';
-                    const response = await fetch(apiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'x-api-key': TOLLGURU_API_KEY
-                        },
-                        body: JSON.stringify({
-                            from: { address: finalOrigin },
-                            to: { address: finalDestination },
-                            vehicle: {
-                                type: vehicleType,
-                                fuelPrice: fuelPrice,
-                                fuelPriceCurrency: "BRL",
-                                fuelEfficiency: {
-                                    city: consumption,
-                                    hwy: consumption,
-                                    units: "km/L"
-                                }
-                            }
-                        })
-                    });
-
-                    if (!response.ok) {
-                        const errorData = await response.json();
-                        const errorMessage = errorData?.message || `Erro HTTP: ${response.status}`;
-                        throw new Error(errorMessage);
-                    }
-
-                    const data = await response.json();
-
-                    if (data.status !== 'OK' || !data.route) {
-                        if (data.message) {
-                           throw new Error(data.message);
-                        }
-                        throw new Error('Não foi possível calcular a rota com pedágios.');
-                    }
-                    
-                    const route = data.route;
-                    const distanceInKm = route.distance.value;
-                    const durationText = formatDuration(route.duration.value);
-                    const tollCost = route.costs.toll || 0;
-                    const fuelCost = route.costs.fuel || 0;
-                    const totalCost = tollCost + fuelCost;
-
-                    resultDiv.innerHTML = `
-                        <div class="p-4 rounded-lg bg-background-color border border-border-color">
-                            <h5 class="font-bold text-lg mb-3">Resultado da Rota (via TollGuru)</h5>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
-                                <div><p class="text-sm text-text-secondary">Duração</p><p class="font-bold text-xl">${durationText}</p></div>
-                                <div><p class="text-sm text-text-secondary">Pedágios</p><p class="font-bold text-xl text-yellow-400">${formatCurrency(tollCost)}</p></div>
-                                <div><p class="text-sm text-text-secondary">Custo Total</p><p class="font-bold text-xl text-brand">${formatCurrency(totalCost)}</p></div>
-                            </div>
-                            <div class="text-center mt-4">
-                                <button id="add-trip-as-expense" data-value="${totalCost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
-                            </div>
-                        </div>`;
-
-                } catch (error) {
-                    console.error("Erro na API TollGuru:", error);
-                    resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
-                    showToast('Erro ao calcular a rota com pedágios.', 'error');
-                }
-            };
+           calculateTripWithTolls
             DOM.carModuleBtn.addEventListener('click', showCarModal);
 
             DOM.carModalContainer.addEventListener('click', async e => {
@@ -1085,6 +994,7 @@
     </script>
 </body>
 </html>
+
 
 
 
