@@ -153,9 +153,8 @@
             // =================================================================================
             // CONFIGURAÇÃO SUPABASE
             // =================================================================================
-           const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // <-- SUBSTITUA PELA SUA URL
-
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
+            const SUPABASE_URL = 'https://zsoxlkuyrysytusncuxf.supabase.co'; // <-- SUBSTITUA PELA SUA URL
+        	const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpzb3hsa3V5cnlzeXR1c25jdXhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc4OTc4MjMsImV4cCI6MjA3MzQ3MzgyM30.HeHE1O6yVu-IiB4y8VztS0YLBruqOnnGcmk2TG2IHp0'; // <-- SUBSTITUA PELA SUA CHAVE ANON
             const HOUSEHOLD_ID = 'default';                               // <-- personalize seu identificador
 
             if (SUPABASE_URL.includes('YOUR-PROJECT') || SUPABASE_ANON_KEY === 'YOUR_ANON_KEY') {
@@ -341,24 +340,24 @@
 
             const renderExpenseList = (expenses) => {
                 if (expenses.length === 0) {
-                    DOM.expensesList.innerHTML = \`
+                    DOM.expensesList.innerHTML = `
                         <div class="h-full flex flex-col items-center justify-center text-center p-6 bg-card-background-color rounded-lg border-2 border-dashed border-border-color">
                             <h3 class="mt-2 text-lg font-semibold">Nenhum Lançamento no Mês</h3>
                             <p class="mt-1 text-text-secondary">Clique em "Adicionar" para começar.</p>
-                        </div>\`;
+                        </div>`;
                     return;
                 }
-                DOM.expensesList.innerHTML = expenses.map(exp => \`
-                    <div class="expense-card p-4 flex items-center gap-4" data-id="\${exp.id}">
-                        <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: \${CATEGORY_COLORS[exp.category]}20">
-                            <span class="text-xl">\${CATEGORY_ICONS[exp.category] || '📎'}</span>
+                DOM.expensesList.innerHTML = expenses.map(exp => `
+                    <div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}">
+                        <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20">
+                            <span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span>
                         </div>
                         <div class="flex-grow">
-                            <p class="font-semibold">\${exp.description}</p>
-                            <p class="text-sm text-text-secondary">\${new Date(exp.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
+                            <p class="font-semibold">${exp.description}</p>
+                            <p class="text-sm text-text-secondary">${new Date(exp.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
                         </div>
-                        <p class="font-bold text-lg">\${formatCurrency(exp.value)}</p>
-                    </div>\`).join('');
+                        <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
+                    </div>`).join('');
             };
 
             // =================================================================================
@@ -368,27 +367,27 @@
                 const { id, date, category, description, value } = expenseData;
                 currentEditingId = id || null;
                 const isEditing = currentEditingId !== null;
-                const categoryOptions = CATEGORIES.map(cat => \`<option value="\${cat}" \${category === cat ? 'selected' : ''}>\${cat}</option>\`).join('');
+                const categoryOptions = CATEGORIES.map(cat => `<option value="${cat}" ${category === cat ? 'selected' : ''}>${cat}</option>`).join('');
 
-                const modalHTML = \`
+                const modalHTML = `
                     <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color">
                         <form id="expense-form-inner">
                             <div class="flex justify-between items-center p-5 border-b border-border-color">
-                                <h3 class="text-xl font-display">\${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
+                                <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
                                 <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
                             </div>
                             <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="\${date || toISODateString(currentDate)}"></div>
-                                <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>\${categoryOptions}</select></div>
-                                <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="\${description || ''}"></div>
-                                <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="\${value || ''}"></div>
+                                <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
+                                <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
+                                <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
+                                <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
                             </div>
                             <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
-                                \${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
+                                ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
                                 <div class="flex gap-4"><button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div>
                             </div>
                         </form>
-                    </div>\`;
+                    </div>`;
 
                 DOM.modalContainer.innerHTML = modalHTML;
                 DOM.mainContainer.classList.add('modal-open');
@@ -531,7 +530,7 @@
             };
 
             const showCarModal = () => {
-                const modalHTML = \`
+                const modalHTML = `
                 <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-3xl border border-border-color flex flex-col" style="max-height: 90vh;">
                     <div class="flex justify-between items-center p-4 border-b border-border-color flex-shrink-0">
                         <div class="flex items-center gap-3">
@@ -550,7 +549,7 @@
                         </div>
                     </div>
                     <div id="car-modal-content" class="p-4 sm:p-6 overflow-y-auto flex-grow"></div>
-                </div>\`;
+                </div>`;
                 DOM.carModalContainer.innerHTML = modalHTML;
                 DOM.mainContainer.classList.add('modal-open');
                 DOM.carModalContainer.classList.add('visible');
@@ -580,61 +579,61 @@
                         let oilProgressColor = 'bg-indigo-500';
                         if (oilProgress > 80) oilProgressColor = 'bg-yellow-500';
                         if (oilProgress >= 100) oilProgressColor = 'bg-red-500';
-                        html = \`
+                        html = `
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">\${latestOdometer.toLocaleString('pt-BR')} km</p></div>
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Consumo Médio</h4><p class="text-2xl font-bold">\${avgConsumption.toFixed(2)} km/L</p></div>
-                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">\${oilKmRemaining.toLocaleString('pt-BR')} km</p></div>
+                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Odômetro Atual</h4><p class="text-2xl font-bold">${latestOdometer.toLocaleString('pt-BR')} km</p></div>
+                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Consumo Médio</h4><p class="text-2xl font-bold">${avgConsumption.toFixed(2)} km/L</p></div>
+                                <div class="bg-background-color p-4 rounded-lg"><h4 class="text-sm font-semibold text-text-secondary uppercase">Próxima Troca Óleo</h4><p class="text-2xl font-bold">${oilKmRemaining.toLocaleString('pt-BR')} km</p></div>
                             </div>
                             <div class="space-y-4">
                                 <h3 class="font-display text-lg">Alertas de Manutenção</h3>
                                 <div class="bg-background-color p-4 rounded-lg">
                                     <div class="flex justify-between items-center mb-1">
                                         <span class="font-semibold">Troca de Óleo</span>
-                                        <span class="text-sm font-medium \${oilProgress >= 100 ? 'text-red-400' : 'text-text-secondary'}">\${kmSinceOilChange.toLocaleString('pt-BR')} / \${oilChangeInterval.toLocaleString('pt-BR')} km</span>
+                                        <span class="text-sm font-medium ${oilProgress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceOilChange.toLocaleString('pt-BR')} / ${oilChangeInterval.toLocaleString('pt-BR')} km</span>
                                     </div>
-                                    <div class="progress-bar h-3 w-full"><div class="progress-bar-inner \${oilProgressColor}" style="width: \${oilProgress}%"></div></div>
+                                    <div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${oilProgressColor}" style="width: ${oilProgress}%"></div></div>
                                 </div>
-                                \${vehicleData.maintenanceHistory.map(maint => {
+                                ${vehicleData.maintenanceHistory.map(maint => {
                                     const kmSinceService = latestOdometer - maint.lastServiceKm;
                                     const progress = Math.min((kmSinceService / maint.kmInterval) * 100, 100);
                                     const kmRemaining = Math.max(0, maint.kmInterval - kmSinceService);
                                     let progressColor = 'bg-indigo-500';
                                     if (progress > 80) progressColor = 'bg-yellow-500';
                                     if (progress >= 100) progressColor = 'bg-red-500';
-                                    return \`
+                                    return `
                                     <div class="bg-background-color p-4 rounded-lg">
                                         <div class="flex justify-between items-center mb-1">
-                                            <span class="font-semibold">\${maint.item} <small class="text-text-secondary">(próxima em \${kmRemaining.toLocaleString('pt-BR')} km)</small></span>
-                                            <span class="text-sm font-medium \${progress >= 100 ? 'text-red-400' : 'text-text-secondary'}">\${kmSinceService.toLocaleString('pt-BR')} / \${maint.kmInterval.toLocaleString('pt-BR')} km</span>
+                                            <span class="font-semibold">${maint.item} <small class="text-text-secondary">(próxima em ${kmRemaining.toLocaleString('pt-BR')} km)</small></span>
+                                            <span class="text-sm font-medium ${progress >= 100 ? 'text-red-400' : 'text-text-secondary'}">${kmSinceService.toLocaleString('pt-BR')} / ${maint.kmInterval.toLocaleString('pt-BR')} km</span>
                                         </div>
-                                        <div class="progress-bar h-3 w-full"><div class="progress-bar-inner \${progressColor}" style="width: \${progress}%"></div></div>
-                                    </div>\`;
+                                        <div class="progress-bar h-3 w-full"><div class="progress-bar-inner ${progressColor}" style="width: ${progress}%"></div></div>
+                                    </div>`;
                                 }).join('')}
-                            </div>\`;
+                            </div>`;
                         break;
                     }
                     case 'profile': {
                         const p = vehicleData.profile || {};
-                        html = \`<form id="car-profile-form" class="space-y-4">
+                        html = `<form id="car-profile-form" class="space-y-4">
                                 <h3 class="font-display text-lg">Perfil do Veículo</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="\${p.model || ''}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="\${p.plate || ''}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Intervalo Troca de Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="\${p.oilChangeKmInterval || '10000'}"></div>
-                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Última Troca de Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="\${p.lastOilChangeKm || '0'}"></div>
+                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Modelo</label><input type="text" id="car-model" class="form-input w-full" value="${p.model || ''}"></div>
+                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Placa</label><input type="text" id="car-plate" class="form-input w-full" value="${p.plate || ''}"></div>
+                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Intervalo Troca de Óleo (km)</label><input type="number" id="car-oil-interval" class="form-input w-full" value="${p.oilChangeKmInterval || '10000'}"></div>
+                                    <div><label class="block text-sm font-medium text-text-secondary mb-1">Última Troca de Óleo (km)</label><input type="number" id="car-last-oil" class="form-input w-full" value="${p.lastOilChangeKm || '0'}"></div>
                                 </div>
                                 <div class="text-right pt-2"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Salvar Perfil</button></div>
-                            </form>\`;
+                            </form>`;
                         break;
                     }
                     case 'fuel': {
                         const sortedFuel = [...vehicleData.fuelHistory].sort((a,b) => b.odometer - a.odometer);
-                        html = \`<form id="fuel-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
+                        html = `<form id="fuel-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
                                 <h3 class="font-display text-lg">Registrar Abastecimento</h3>
                                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="\${toISODateString(new Date())}"></div>
-                                    <div><label class="block text-sm text-text-secondary">Odômetro Atual</label><input type="number" id="fuel-odometer" placeholder="\${getLatestOdometer()}" class="form-input w-full"></div>
+                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
+                                    <div><label class="block text-sm text-text-secondary">Odômetro Atual</label><input type="number" id="fuel-odometer" placeholder="${getLatestOdometer()}" class="form-input w-full"></div>
                                     <div><label class="block text-sm text-text-secondary">Litros (L)</label><input type="number" step="0.01" id="fuel-liters" class="form-input w-full"></div>
                                     <div><label class="block text-sm text-text-secondary">Valor Total (R$)</label><input type="number" step="0.01" id="fuel-total-value" class="form-input w-full"></div>
                                 </div>
@@ -642,30 +641,30 @@
                             </form>
                             <h3 class="font-display text-lg mb-3">Histórico de Abastecimentos</h3>
                             <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-                            \${sortedFuel.map((current, index) => {
+                            ${sortedFuel.map((current, index) => {
                                 const previous = sortedFuel[index + 1];
-                                let efficiencyText = \`<span class="text-xs text-text-secondary">-- km/L</span>\`;
+                                let efficiencyText = `<span class="text-xs text-text-secondary">-- km/L</span>`;
                                 if (previous) {
                                     const dist = current.odometer - previous.odometer;
                                     const liters = current.liters;
                                     if (dist > 0 && liters > 0) {
-                                        efficiencyText = \`<span class="font-semibold text-green-400">\${(dist / liters).toFixed(2)} km/L</span>\`;
+                                        efficiencyText = `<span class="font-semibold text-green-400">${(dist / liters).toFixed(2)} km/L</span>`;
                                     }
                                 }
-                                return \`<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
+                                return `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
                                     <div>
-                                        <p class="font-semibold">\${new Date(current.date).toLocaleDateString('pt-BR')}</p>
-                                        <p class="text-text-secondary">\${current.odometer.toLocaleString('pt-BR')} km &bull; \${current.liters} L &bull; \${formatCurrency(current.totalValue)}</p>
+                                        <p class="font-semibold">${new Date(current.date).toLocaleDateString('pt-BR')}</p>
+                                        <p class="text-text-secondary">${current.odometer.toLocaleString('pt-BR')} km &bull; ${current.liters} L &bull; ${formatCurrency(current.totalValue)}</p>
                                     </div>
-                                    \${efficiencyText}
-                                </div>\`;
-                            }).join('') || \`<p class="text-text-secondary text-center p-4">Nenhum registro.</p>\`}
-                            </div>\`;
+                                    ${efficiencyText}
+                                </div>`;
+                            }).join('') || `<p class="text-text-secondary text-center p-4">Nenhum registro.</p>`}
+                            </div>`;
                         break;
                     }
                     case 'trips': {
                         const sortedTrips = [...vehicleData.tripHistory].sort((a,b) => new Date(b.date) - new Date(a.date));
-                        html = \`
+                        html = `
                             <form id="trip-calculator-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
                                 <h3 class="font-display text-lg">Calculadora de Rota e Custo (API Mapbox)</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -680,7 +679,7 @@
                             <form id="trip-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
                                 <h3 class="font-display text-lg">Registro Manual de Viagens</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="trip-date" class="form-input w-full" value="\${toISODateString(new Date())}"></div>
+                                    <div><label class="block text-sm text-text-secondary">Data</label><input type="date" id="trip-date" class="form-input w-full" value="${toISODateString(new Date())}"></div>
                                     <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Descrição</label><input type="text" id="trip-desc" placeholder="Viagem para a praia" class="form-input w-full"></div>
                                     <div><label class="block text-sm text-text-secondary">Distância (km)</label><input type="number" id="trip-dist" class="form-input w-full"></div>
                                 </div>
@@ -689,15 +688,15 @@
 
                             <h3 class="font-display text-lg mb-3">Histórico de Viagens</h3>
                             <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            \${sortedTrips.map(trip => \`<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
-                                <div><p class="font-semibold">\${trip.description}</p><p class="text-text-secondary">\${new Date(trip.date).toLocaleDateString('pt-BR')}</p></div>
-                                <p class="font-semibold">\${trip.distance.toLocaleString('pt-BR')} km</p>
-                            </div>\`).join('') || \`<p class="text-text-secondary text-center p-4">Nenhuma viagem registrada.</p>\`}
-                            </div>\`;
+                            ${sortedTrips.map(trip => `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
+                                <div><p class="font-semibold">${trip.description}</p><p class="text-text-secondary">${new Date(trip.date).toLocaleDateString('pt-BR')}</p></div>
+                                <p class="font-semibold">${trip.distance.toLocaleString('pt-BR')} km</p>
+                            </div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma viagem registrada.</p>`}
+                            </div>`;
                         break;
                     }
                     case 'maintenance': {
-                        html = \`<form id="maint-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
+                        html = `<form id="maint-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
                                 <h3 class="font-display text-lg">Agendar Nova Manutenção</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div class="sm:col-span-2"><label class="block text-sm text-text-secondary">Item</label><input type="text" id="maint-item" placeholder="Troca de Pneus" class="form-input w-full"></div>
@@ -707,23 +706,23 @@
                             </form>
                             <h3 class="font-display text-lg mb-3">Manutenções Agendadas</h3>
                             <div class="space-y-2 max-h-80 overflow-y-auto pr-2">
-                            \${vehicleData.maintenanceHistory.map(maint => \`<div class="bg-background-color p-3 rounded-lg text-sm">
+                            ${vehicleData.maintenanceHistory.map(maint => `<div class="bg-background-color p-3 rounded-lg text-sm">
                                 <div class="flex justify-between items-start">
                                     <div>
-                                        <p class="font-semibold">\${maint.item}</p>
-                                        <p class="text-text-secondary">Último serviço em \${maint.lastServiceKm.toLocaleString('pt-BR')} km</p>
+                                        <p class="font-semibold">${maint.item}</p>
+                                        <p class="text-text-secondary">Último serviço em ${maint.lastServiceKm.toLocaleString('pt-BR')} km</p>
                                     </div>
                                     <div class="flex gap-2">
-                                        <button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="\${maint.id}">
+                                        <button class="maint-done-btn p-2 hover:bg-gray-700 rounded-full" title="Registrar Serviço Feito Agora" data-id="${maint.id}">
                                             <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                         </button>
-                                        <button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="\${maint.id}">
+                                        <button class="maint-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir Agendamento" data-id="${maint.id}">
                                            <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                         </button>
                                     </div>
                                 </div>
-                            </div>\`).join('') || \`<p class="text-text-secondary text-center p-4">Nenhuma manutenção agendada.</p>\`}
-                            </div>\`;
+                            </div>`).join('') || `<p class="text-text-secondary text-center p-4">Nenhuma manutenção agendada.</p>`}
+                            </div>`;
                         break;
                     }
                 }
@@ -734,8 +733,8 @@
                 const hours = Math.floor(seconds / 3600);
                 const minutes = Math.floor((seconds % 3600) / 60);
                 let str = '';
-                if (hours > 0) str += \`\${hours}h \`;
-                if (minutes > 0) str += \`\${minutes}min\`;
+                if (hours > 0) str += `${hours}h `;
+                if (minutes > 0) str += `${minutes}min`;
                 return str.trim() || '0min';
             };
 
@@ -751,16 +750,16 @@
                 resultDiv.classList.remove('hidden');
                 resultDiv.innerHTML = `<p class="text-center p-4">Calculando...</p>`;
                 try {
-                    const geocodeUrl = (place) => \`https://api.mapbox.com/geocoding/v5/mapbox.places/\${encodeURIComponent(place)}.json?access_token=\${MAPBOX_ACCESS_TOKEN}&limit=1\`;
+                    const geocodeUrl = (place) => `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(place)}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1`;
                     const originResponse = await fetch(geocodeUrl(origin));
                     const originData = await originResponse.json();
-                    if (!originData.features || originData.features.length === 0) throw new Error(\`Endereço de origem não encontrado: \${origin}\`);
+                    if (!originData.features || originData.features.length === 0) throw new Error(`Endereço de origem não encontrado: ${origin}`);
                     const originCoords = originData.features[0].center;
                     const destResponse = await fetch(geocodeUrl(destination));
                     const destData = await destResponse.json();
-                    if (!destData.features || destData.features.length === 0) throw new Error(\`Endereço de destino não encontrado: \${destination}\`);
+                    if (!destData.features || destData.features.length === 0) throw new Error(`Endereço de destino não encontrado: ${destination}`);
                     const destCoords = destData.features[0].center;
-                    const directionsUrl = \`https://api.mapbox.com/directions/v5/mapbox/driving/\${originCoords[0]},\${originCoords[1]};\${destCoords[0]},\${destCoords[1]}?access_token=\${MAPBOX_ACCESS_TOKEN}\`;
+                    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${originCoords[0]},${originCoords[1]};${destCoords[0]},${destCoords[1]}?access_token=${MAPBOX_ACCESS_TOKEN}`;
                     const directionsResponse = await fetch(directionsUrl);
                     const directionsData = await directionsResponse.json();
                     if (directionsData.code !== 'Ok') throw new Error(directionsData.message || 'Não foi possível calcular a rota.');
@@ -768,21 +767,21 @@
                     const distanceInKm = route.distance / 1000;
                     const durationText = formatDuration(route.duration);
                     const cost = (distanceInKm / consumption) * fuelPrice;
-                    resultDiv.innerHTML = \`
+                    resultDiv.innerHTML = `
                         <div class="p-4 rounded-lg bg-background-color border border-border-color">
                             <h5 class="font-bold text-lg mb-2">Resultado da Rota (via Mapbox)</h5>
                             <div class="grid grid-cols-3 gap-2 text-center">
-                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">\${distanceInKm.toFixed(1)} km</p></div>
-                                <div><p class="text-sm text-text-secondary">Duração Est.</p><p class="font-bold text-xl">\${durationText}</p></div>
-                                <div><p class="text-sm text-text-secondary">Custo Est.</p><p class="font-bold text-xl text-brand">\${formatCurrency(cost)}</p></div>
+                                <div><p class="text-sm text-text-secondary">Distância</p><p class="font-bold text-xl">${distanceInKm.toFixed(1)} km</p></div>
+                                <div><p class="text-sm text-text-secondary">Duração Est.</p><p class="font-bold text-xl">${durationText}</p></div>
+                                <div><p class="text-sm text-text-secondary">Custo Est.</p><p class="font-bold text-xl text-brand">${formatCurrency(cost)}</p></div>
                             </div>
                             <div class="text-center mt-4">
-                                <button id="add-trip-as-expense" data-value="\${cost.toFixed(2)}" data-desc="Viagem: \${origin} para \${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
+                                <button id="add-trip-as-expense" data-value="${cost.toFixed(2)}" data-desc="Viagem: ${origin} para ${destination}" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-4 rounded-lg text-sm">Lançar como Despesa</button>
                             </div>
-                        </div>\`;
+                        </div>`;
                 } catch(error) {
                     console.error("Erro na API do Mapbox:", error);
-                    resultDiv.innerHTML = \`<p class="text-center text-red-400 p-4">Erro: \${error.message}</p>\`;
+                    resultDiv.innerHTML = `<p class="text-center text-red-400 p-4">Erro: ${error.message}</p>`;
                     showToast('Erro ao calcular a rota.', 'error');
                 }
             };
@@ -809,7 +808,7 @@
                 if (e.target.closest('.maint-done-btn')) {
                     const id = e.target.closest('.maint-done-btn').dataset.id;
                     const latestOdometer = getLatestOdometer();
-                    const newOdometer = prompt(\`Serviço realizado! Qual o KM atual do veículo?\`, latestOdometer);
+                    const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, latestOdometer);
                     if (newOdometer && !isNaN(newOdometer)) {
                         const idx = vehicleData.maintenanceHistory.findIndex(m => String(m.id) === String(id));
                         vehicleData.maintenanceHistory[idx].lastServiceKm = parseInt(newOdometer);
