@@ -8,6 +8,15 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style> body { background-color: #111827; } </style>
 </head>
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#111827">
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(console.error);
+  });
+}
+</script>
 <body class="flex items-center justify-center h-screen p-4">
     <div class="w-full max-w-md p-8 space-y-6 bg-[#1f2937] rounded-xl shadow-lg border border-[#374151]">
         <div>
@@ -64,5 +73,6 @@
 </body>
 
 </html>
+
 
 
