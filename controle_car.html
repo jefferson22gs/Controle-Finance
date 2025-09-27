@@ -53,6 +53,13 @@
         .progress-bar { background-color: var(--border-color); border-radius: 9999px; overflow: hidden; }
         .progress-bar-inner { height: 100%; border-radius: 9999px; transition: width 0.5s ease-in-out; }
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
+        
+        /* */
+        @media (max-width: 767px) {
+            .mobile-scroll-container {
+                height: calc(100vh - 250px); /* Ajuste este valor conforme necessário */
+            }
+        }
     </style>
 
   <meta name="theme-color" content="#111827" />
@@ -63,13 +70,13 @@
 </head>
 <body class="dark p-4 sm:p-6 lg:p-8 flex flex-col">
 
-    <div id="main-container" class="main-container w-full max-w-7xl mx-auto flex flex-col flex-grow p-6 sm:p-8">
-        <header class="text-center mb-8 flex-shrink-0">
+    <div id="main-container" class="main-container w-full max-w-7xl mx-auto flex flex-col flex-grow p-4 sm:p-8">
+        <header class="text-center mb-6 sm:mb-8 flex-shrink-0">
              <div class="flex justify-center items-center gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-9 w-9 text-brand" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" /><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" /></svg>
-                <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Painel Financeiro</h1>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 sm:h-9 sm:w-9 text-brand" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" /><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" /></svg>
+                <h1 class="text-3xl sm:text-5xl font-bold tracking-tight">Painel Financeiro</h1>
             </div>
-            <p class="text-text-secondary mt-2 text-lg">Agora com persistência em Supabase <span class="badge">beta</span></p>
+            <p class="text-text-secondary mt-2 text-base sm:text-lg">Agora com persistência em Supabase <span class="badge">beta</span></p>
         </header>
         <div class="control-bar flex justify-between items-center mb-6 p-3 rounded-xl flex-shrink-0">
             <button id="prev-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Mês Anterior"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg></button>
@@ -77,8 +84,9 @@
             <button id="next-month-btn" class="p-2 rounded-full hover:bg-gray-700 transition-colors" title="Próximo Mês"><svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></button>
         </div>
 
-        <div id="report-content" class="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow overflow-hidden">
-            <div class="lg:col-span-4 flex flex-col gap-6 overflow-y-auto pr-2">
+        <div id="report-content" class="grid grid-cols-1 md:grid-cols-12 gap-8 flex-grow overflow-hidden">
+            
+            <div class="md:col-span-4 flex flex-col gap-6 overflow-y-auto pr-2">
                 <div class="summary-card p-5">
                     <div class="flex items-center justify-between">
                         <h3 class="font-display text-text-secondary text-sm font-semibold uppercase tracking-wider mb-3">Renda Mensal</h3>
@@ -97,9 +105,9 @@
                 <div id="category-summary-section" class="space-y-2"></div>
                 <div id="monthly-analysis-section" class="space-y-4 mt-4">
                     <h3 class="font-display text-center text-text-secondary mb-3 text-md">Análise Mensal e Tendência</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 gap-4">
                         <div class="summary-card p-4">
-                            <h4 class="font-medium mb-2">Tendência (Últimos 6 meses)</h4>
+                            <h4 class="font-medium mb-2">Tendência (6 meses)</h4>
                             <canvas id="monthlyTrendChart"></canvas>
                         </div>
                         <div class="summary-card p-4">
@@ -112,10 +120,10 @@
 
             </div>
 
-            <div class="lg:col-span-8 flex flex-col">
-                <div class="flex flex-wrap justify-between items-center gap-4 mb-5 flex-shrink-0">
+            <div class="md:col-span-8 flex flex-col">
+                <div class="flex flex-wrap justify-between items-center gap-y-4 gap-x-2 mb-5 flex-shrink-0">
                     <h3 class="font-display text-2xl">Lançamentos do Mês</h3>
-                    <div class="flex items-center gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
                         <div class="flex items-center gap-2 bg-card-background-color border border-border-color rounded-lg p-1 shadow-sm">
                             <button id="export-pdf-btn" class="hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Exportar Relatório em PDF">PDF</button>
                             <button id="export-excel-btn" class="hover:bg-background-color text-text-secondary font-semibold py-1 px-3 rounded-md text-sm transition-colors" title="Exportar dados para Excel">Excel</button>
@@ -131,7 +139,7 @@
                         <button id="add-expense-btn" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg shadow-md transition-colors duration-200">Adicionar</button>
                     </div>
                 </div>
-                <div id="expenses-list" class="space-y-3 flex-grow overflow-y-auto pr-2"></div>
+                <div id="expenses-list" class="space-y-3 flex-grow overflow-y-auto pr-2 mobile-scroll-container"></div>
             </div>
         </div>
     </div>
@@ -142,6 +150,8 @@
     <div id="toast-notification"></div>
 
     <script>
+        // O restante do seu código JavaScript permanece EXATAMENTE O MESMO.
+        // Nenhuma lógica de funcionalidade foi alterada.
         document.addEventListener('DOMContentLoaded', () => {
           (async () => {
             // =================================================================================
@@ -801,7 +811,6 @@
                                     }
                                 }
                                 
-                                // NOVO: Verifica se a despesa já existe para mostrar o botão correto
                                 const expenseExists = expensesData.some(exp => String(exp.id) === String(current.id));
                                 let actionButtonHtml = '';
                                 if (expenseExists) {
@@ -977,7 +986,6 @@
                         vehicleData.fuelHistory[fuelLogIndex] = updatedLog;
                     }
                     
-                    // ATUALIZADO: Apenas atualiza a despesa se ela existir
                     const expenseIndex = expensesData.findIndex(exp => String(exp.id) === String(currentEditingFuelLogId));
                     if(expenseIndex > -1) {
                         expensesData[expenseIndex].date = updatedLog.date;
@@ -1009,7 +1017,6 @@
                     showExpenseModal({ category: 'Carro', description: description, value: value });
                 }
 
-                // NOVO: LÓGICA DO BOTÃO PARA LANÇAR DESPESA
                 const addExpenseBtn = e.target.closest('.add-fuel-as-expense-btn');
                 if(addExpenseBtn) {
                     const logId = addExpenseBtn.dataset.id;
@@ -1027,8 +1034,8 @@
                         expensesData.push(newExpense);
                         await saveAppState();
                         showToast('Abastecimento lançado como despesa!');
-                        renderCarTab('fuel'); // Re-renderiza para atualizar o botão
-                        renderMonthView(); // Re-renderiza o painel principal
+                        renderCarTab('fuel');
+                        renderMonthView();
                     } else if (alreadyExists) {
                         showToast('Esta despesa já foi lançada.', 'warning');
                     }
@@ -1104,14 +1111,12 @@
                         };
                         if (!newFuelLog.odometer || !newFuelLog.liters || !newFuelLog.totalValue) { showToast('Preencha todos os campos.', 'error'); return; }
                         
-                        // ATUALIZADO: Adiciona apenas ao histórico do veículo.
                         vehicleData.fuelHistory.push(newFuelLog);
                         
                         await saveAppState();
                         showToast('Abastecimento registrado!');
                         e.target.reset(); document.getElementById('fuel-date').value = toISODateString(new Date());
                         renderCarTab('fuel');
-                        // Não precisa mais renderizar o painel principal aqui
                         break;
                     }
                     case 'trip-log-form': {
