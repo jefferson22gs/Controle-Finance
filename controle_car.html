@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -6,46 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel Financeiro - Casal (Supabase)</title>
 
-    <!-- Tailwind & libs -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- Export helpers (mantidos) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-    <!-- Supabase JS v2 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet">
-
-    <!--
-        ===========================================
-        SETUP RÁPIDO (LEIA-ME)
-        ===========================================
-        1) Crie a tabela no Supabase (SQL):
-
-           create table if not exists public.app_state (
-             id text primary key,
-             data jsonb not null default '{}'::jsonb
-           );
-
-           -- Políticas RLS (exemplo didático - ajuste para seu caso!)
-           alter table public.app_state enable row level security;
-           drop policy if exists "app_state_all" on public.app_state;
-           create policy "app_state_all" on public.app_state
-           for all
-           using (true)
-           with check (true);
-
-        2) Preencha SUPABASE_URL, SUPABASE_ANON_KEY e HOUSEHOLD_ID abaixo.
-           HOUSEHOLD_ID separa seus dados de outros usuários/projetos.
-
-        3) Abra este arquivo em um host/servidor ou diretamente no navegador.
-    -->
 
     <style>
         :root {
@@ -84,7 +55,6 @@
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
     </style>
 
-  <!-- PWA meta -->
   <meta name="theme-color" content="#111827" />
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -125,6 +95,21 @@
                     <canvas id="expensesChart"></canvas>
                 </div>
                 <div id="category-summary-section" class="space-y-2"></div>
+                <div id="monthly-analysis-section" class="space-y-4 mt-4">
+                    <h3 class="font-display text-center text-text-secondary mb-3 text-md">Análise Mensal e Tendência</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="summary-card p-4">
+                            <h4 class="font-medium mb-2">Tendência (Últimos 6 meses)</h4>
+                            <canvas id="monthlyTrendChart"></canvas>
+                        </div>
+                        <div class="summary-card p-4">
+                            <h4 class="font-medium mb-2">Categorias no Mês</h4>
+                            <canvas id="monthlyCategoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="monthly-top-list" class="space-y-2 mt-2"></div>
+                </div>
+
             </div>
 
             <div class="lg:col-span-8 flex flex-col">
@@ -153,6 +138,7 @@
 
     <div id="expense-modal-container" class="modal-container"></div>
     <div id="car-modal-container" class="modal-container"></div>
+    <div id="fuel-log-modal-container" class="modal-container"></div>
     <div id="toast-notification"></div>
 
     <script>
@@ -170,21 +156,18 @@
             return;
             }
 
-            // Linha Corrigida: Usando SUPABASE_KEY
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 			let userId = null;
-        const { data: { session } } = await supabase.auth.getSession();
+            const { data: { session } } = await supabase.auth.getSession();
 
-        if (!session) {
-            // Se não houver usuário logado, redireciona para a página de login
-            window.location.href = 'index.html';
-            return; // Para a execução do script
-        } else {
-            // Se estiver logado, guarda o ID do usuário
-            userId = session.user.id;
-        }
+            if (!session) {
+                window.location.href = 'index.html';
+                return;
+            } else {
+                userId = session.user.id;
+            }
             // =================================================================================
-            // CONSTANTES / ESTADO (iguais ao original)
+            // CONSTANTES / ESTADO
             // =================================================================================
             const CATEGORIES = ['Mercado', 'Contas', 'Apartamento', 'Carro', 'Lazer', 'Delivery', 'Posto', 'Farmácia', 'Roupa', 'Escola', 'Cachorro - Pet', 'Poupança Filho', 'Reserva', 'Outros'];
             const CATEGORY_ICONS = { 'Mercado': '🛒', 'Contas': '💡', 'Apartamento': '🏢', 'Carro': '🚗', 'Lazer': '🎉', 'Delivery': '🍔', 'Posto': '⛽', 'Farmácia': '💊', 'Roupa': '👕', 'Escola': '🎓', 'Cachorro - Pet': '🐶', 'Poupança Filho': '🐖', 'Reserva': '🏦', 'Outros': '📎' };
@@ -196,6 +179,7 @@
 
             let currentDate = new Date();
             let currentEditingId = null;
+            let currentEditingFuelLogId = null;
             window.myExpensesChart = null;
 
             const DOM = {
@@ -208,7 +192,8 @@
                 exportJsonBtn: document.getElementById('export-json-btn'), exportPdfBtn: document.getElementById('export-pdf-btn'),
                 exportExcelBtn: document.getElementById('export-excel-btn'), importInput: document.getElementById('import-file-input'),
                 toast: document.getElementById('toast-notification'),
-                carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container')
+                carModuleBtn: document.getElementById('car-module-btn'), carModalContainer: document.getElementById('car-modal-container'),
+                fuelLogModalContainer: document.getElementById('fuel-log-modal-container')
             };
 
             // =================================================================================
@@ -226,7 +211,7 @@
             };
 
             // =================================================================================
-            // SUPABASE - APP STATE (jsonb)
+            // SUPABASE - APP STATE
             // =================================================================================
             async function getAppState() {
                 const { data, error } = await supabase
@@ -270,7 +255,7 @@
             }
 
             // =================================================================================
-            // RENDERIZAÇÃO DE TELA (igual ao original)
+            // RENDERIZAÇÃO DE TELA
             // =================================================================================
             const renderMonthView = () => {
                 const year = currentDate.getFullYear();
@@ -353,6 +338,51 @@
                         },
                         options: { responsive: true, cutout: '70%', plugins: { legend: { display: false }, tooltip: { bodyFont: { size: 14 } } } }
                     });
+                
+                try {
+                    const trendCtx = document.getElementById('monthlyTrendChart').getContext('2d');
+                    const months = [];
+                    const totals = [];
+                    for (let i=5;i>=0;i--) {
+                        const d = new Date(currentDate.getFullYear(), currentDate.getMonth()-i, 1);
+                        const key = d.toLocaleString('pt-BR', { month: 'short', year: 'numeric' });
+                        months.push(key);
+                        const totalForMonth = expensesData
+                            .filter(ex => {
+                                const exDate = new Date(ex.date);
+                                return exDate.getFullYear() === d.getFullYear() && exDate.getMonth() === d.getMonth();
+                            })
+                            .reduce((s, e) => s + (e.value || 0), 0);
+                        totals.push(totalForMonth);
+                    }
+                    if (window.monthlyTrendChart) window.monthlyTrendChart.destroy();
+                    window.monthlyTrendChart = new Chart(trendCtx, {
+                        type: 'bar',
+                        data: { labels: months, datasets: [{ label: 'Total Saídas', data: totals, backgroundColor: months.map(()=>'#6b7280') }] },
+                        options: { responsive: true, plugins: { legend: { display: false } } }
+                    });
+
+                    const catCtx = document.getElementById('monthlyCategoryChart').getContext('2d');
+                    if (window.monthlyCategoryChart) window.monthlyCategoryChart.destroy();
+                    window.monthlyCategoryChart = new Chart(catCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: summaryByCategory.map(i => i.category),
+                            datasets: [{ label: 'Gasto por categoria', data: summaryByCategory.map(i => i.total), backgroundColor: summaryByCategory.map(i => CATEGORY_COLORS[i.category] || '#6b7280') }]
+                        },
+                        options: { responsive: true, plugins: { legend: { display: false } } }
+                    });
+
+                    const topList = document.getElementById('monthly-top-list');
+                    const sorted = summaryByCategory.slice().sort((a,b)=>b.total-a.total);
+                    if (sorted.length===0) {
+                        topList.innerHTML = '<p class="text-text-secondary">Nenhuma despesa registrada no mês.</p>';
+                    } else {
+                        topList.innerHTML = sorted.map(s => `<div class="summary-card p-3 flex justify-between items-center text-sm"><div class="flex items-center gap-3"><div class="w-8 h-8 flex items-center justify-center rounded-md" style="background-color: ${'${CATEGORY_COLORS[s.category] || "#6b7280"}'.replace('"','\\"')}20"><span class="text-xl">${'${CATEGORY_ICONS[s.category] || "📎"}'.replace('"','\\"')}</span></div><h4 class="font-medium">${'${s.category}'.replace('"','\\"')}</h4></div><p class="font-semibold">${'${formatCurrency(s.total)}'.replace('"','\\"')}</p></div>`).join('');
+                    }
+                } catch (err) {
+                    console.error('Erro ao gerar análise mensal adicional:', err);
+                }
                 } else {
                     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
                 }
@@ -422,6 +452,38 @@
                 DOM.body.classList.remove('modal-open-body');
                 setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
             };
+            
+            const showFuelLogModal = (logData = {}) => {
+                const { id, date, odometer, liters, totalValue } = logData;
+                currentEditingFuelLogId = id;
+
+                const modalHTML = `
+                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-lg border border-border-color z-50">
+                    <form id="fuel-log-edit-form-inner">
+                        <div class="flex justify-between items-center p-5 border-b border-border-color">
+                            <h3 class="text-xl font-display">Editar Abastecimento</h3>
+                            <button type="button" class="fuel-modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
+                        </div>
+                        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div><label for="fuel-form-date" class="block text-sm text-text-secondary">Data</label><input type="date" id="fuel-form-date" class="form-input w-full" required value="${date || ''}"></div>
+                            <div><label for="fuel-form-odometer" class="block text-sm text-text-secondary">Odômetro</label><input type="number" id="fuel-form-odometer" class="form-input w-full" required value="${odometer || ''}"></div>
+                            <div><label for="fuel-form-liters" class="block text-sm text-text-secondary">Litros (L)</label><input type="number" step="0.01" id="fuel-form-liters" class="form-input w-full" required value="${liters || ''}"></div>
+                            <div><label for="fuel-form-total-value" class="block text-sm text-text-secondary">Valor Total (R$)</label><input type="number" step="0.01" id="fuel-form-total-value" class="form-input w-full" required value="${totalValue || ''}"></div>
+                        </div>
+                        <div class="flex justify-end p-4 bg-background-color rounded-b-xl gap-4">
+                           <button type="button" class="fuel-modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button>
+                           <button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>`;
+                DOM.fuelLogModalContainer.innerHTML = modalHTML;
+                DOM.fuelLogModalContainer.classList.add('visible');
+            };
+
+            const hideFuelLogModal = () => {
+                DOM.fuelLogModalContainer.classList.remove('visible');
+                setTimeout(() => { DOM.fuelLogModalContainer.innerHTML = ''; currentEditingFuelLogId = null; }, 300);
+            };
 
             // =================================================================================
             // EVENTOS
@@ -486,7 +548,7 @@
             });
 
             // =================================================================================
-            // EXPORTAÇÃO / IMPORTAÇÃO (JSON simples usando o estado atual)
+            // EXPORTAÇÃO / IMPORTAÇÃO
             // =================================================================================
             DOM.exportJsonBtn.addEventListener('click', async () => {
                 try {
@@ -506,52 +568,35 @@
                     showToast('Falha ao exportar backup.', 'error');
                 }
             });
-			// ... (código existente do exportJsonBtn) ...
 
-            // ADICIONAR ESTE BLOCO PARA EXPORTAR PDF
             DOM.exportPdfBtn.addEventListener('click', () => {
                 showToast('Gerando PDF, por favor aguarde...');
-                const reportContent = document.getElementById('report-content'); // O elemento que queremos imprimir
+                const reportContent = document.getElementById('report-content');
                 const originalStyles = reportContent.style.transform;
-                reportContent.style.transform = 'scale(1)'; // Garante a escala correta
+                reportContent.style.transform = 'scale(1)';
 
                 html2canvas(reportContent, {
-                    scale: 2, // Aumenta a resolução da imagem
-                    useCORS: true,
-                    backgroundColor: '#1f2937' // Cor de fundo do card
+                    scale: 2, useCORS: true, backgroundColor: '#1f2937'
                 }).then(canvas => {
                     const imgData = canvas.toDataURL('image/png');
                     const { jsPDF } = window.jspdf;
-                    
-                    // A4 page size: 210mm x 297mm. 
-                    // A proporção da imagem precisa caber nisso.
-                    const pdf = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'mm',
-                        format: 'a4'
-                    });
-
+                    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
                     const pdfWidth = pdf.internal.pageSize.getWidth();
                     const pdfHeight = pdf.internal.pageSize.getHeight();
                     const canvasWidth = canvas.width;
                     const canvasHeight = canvas.height;
                     const ratio = canvasWidth / canvasHeight;
-                    
-                    let imgWidth = pdfWidth - 20; // com margens
+                    let imgWidth = pdfWidth - 20;
                     let imgHeight = imgWidth / ratio;
-
-                    // Se a altura for maior que a página, recalcula com base na altura
                     if (imgHeight > pdfHeight - 20) {
                         imgHeight = pdfHeight - 20;
                         imgWidth = imgHeight * ratio;
                     }
-                    
                     const x = (pdfWidth - imgWidth) / 2;
-                    const y = 10; // Margem superior
-
+                    const y = 10;
                     pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
                     pdf.save(`relatorio_financeiro_${getMonthYearKey(currentDate)}.pdf`);
-                    reportContent.style.transform = originalStyles; // Restaura o estilo
+                    reportContent.style.transform = originalStyles;
                     showToast('PDF exportado com sucesso!');
                 }).catch(err => {
                     console.error('Erro ao gerar PDF:', err);
@@ -560,54 +605,36 @@
                 });
             });
 
-            // ADICIONAR ESTE BLOCO PARA EXPORTAR EXCEL
             DOM.exportExcelBtn.addEventListener('click', () => {
                 try {
                     const monthKey = getMonthYearKey(currentDate);
                     const monthExpenses = expensesData.filter(e => getMonthYearKey(new Date(e.date)) === monthKey);
-
                     if (monthExpenses.length === 0) {
                         showToast('Não há dados para exportar neste mês.', 'warning');
                         return;
                     }
-
-                    // Prepara os dados para a planilha
                     const dataToExport = monthExpenses.map(exp => ({
                         'Data': new Date(exp.date).toLocaleDateString('pt-BR'),
                         'Descrição': exp.description,
                         'Categoria': exp.category,
                         'Valor': exp.value
                     }));
-
                     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
                     const workbook = XLSX.utils.book_new();
                     XLSX.utils.book_append_sheet(workbook, worksheet, 'Despesas');
-
-                    // Formata as colunas
-                    worksheet['!cols'] = [
-                        { wch: 12 }, // Data
-                        { wch: 40 }, // Descrição
-                        { wch: 20 }, // Categoria
-                        { wch: 15 }  // Valor
-                    ];
-                    // Formata a coluna de valor como moeda
+                    worksheet['!cols'] = [{ wch: 12 }, { wch: 40 }, { wch: 20 }, { wch: 15 }];
                     dataToExport.forEach((_data, index) => {
                         const cellRef = XLSX.utils.encode_cell({c: 3, r: index + 1});
                         worksheet[cellRef].t = 'n';
                         worksheet[cellRef].z = 'R$ #,##0.00';
                     });
-
-
                     XLSX.writeFile(workbook, `despesas_${monthKey}.xlsx`);
                     showToast('Excel exportado com sucesso!');
-
                 } catch (err) {
                     console.error('Erro ao gerar Excel:', err);
                     showToast('Falha ao gerar o Excel.', 'error');
                 }
             });
-
-            // ... (código existente do importInput) ...
 
             DOM.importInput.addEventListener('change', async (e) => {
                 const file = e.target.files?.[0];
@@ -628,9 +655,9 @@
                     e.target.value = '';
                 }
             });
-
+            
             // =================================================================================
-            // MÓDULO VEICULAR (usando vehicleData dentro do estado Supabase)
+            // MÓDULO VEICULAR
             // =================================================================================
             const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
 
@@ -773,12 +800,31 @@
                                         efficiencyText = `<span class="font-semibold text-green-400">${(dist / liters).toFixed(2)} km/L</span>`;
                                     }
                                 }
+                                
+                                // NOVO: Verifica se a despesa já existe para mostrar o botão correto
+                                const expenseExists = expensesData.some(exp => String(exp.id) === String(current.id));
+                                let actionButtonHtml = '';
+                                if (expenseExists) {
+                                    actionButtonHtml = `<span class="p-2 text-green-400" title="Já lançado como despesa"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>`;
+                                } else {
+                                    actionButtonHtml = `<button class="add-fuel-as-expense-btn p-2 hover:bg-gray-700 rounded-full" title="Lançar como Despesa" data-id="${current.id}"><svg class="w-4 h-4 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M8.433 7.418c.158-.103.346-.196.567-.267v1.698a2.5 2.5 0 00-.567-.267C8.07 8.484 8 8.731 8 9c0 .269.07.516.19.733.158.275.385.502.65.666v1.698c-.121.041-.24.08-.356.118a3 3 0 01-1.186.183c-1.657 0-3-1.343-3-3s1.343-3 3-3c.225 0 .445.025.66.071-.003.018-.006.036-.009.054l-.018.118zM12 11.25a2.5 2.5 0 01-2.5-2.5V6.25a2.5 2.5 0 012.5-2.5c1.381 0 2.5 1.119 2.5 2.5v2.5a2.5 2.5 0 01-2.5 2.5z" /><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 10a3 3 0 116 0 3 3 0 01-6 0z" /></svg></button>`;
+                                }
+
                                 return `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
-                                    <div>
+                                    <div class="flex-grow">
                                         <p class="font-semibold">${new Date(current.date).toLocaleDateString('pt-BR')}</p>
                                         <p class="text-text-secondary">${current.odometer.toLocaleString('pt-BR')} km &bull; ${current.liters} L &bull; ${formatCurrency(current.totalValue)}</p>
                                     </div>
-                                    ${efficiencyText}
+                                    <div class="flex items-center gap-2">
+                                        ${efficiencyText}
+                                        ${actionButtonHtml}
+                                        <button class="fuel-edit-btn p-2 hover:bg-gray-700 rounded-full" title="Editar" data-id="${current.id}">
+                                           <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z"></path></svg>
+                                        </button>
+                                        <button class="fuel-delete-btn p-2 hover:bg-gray-700 rounded-full" title="Excluir" data-id="${current.id}">
+                                           <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                        </button>
+                                    </div>
                                 </div>`;
                             }).join('') || `<p class="text-text-secondary text-center p-4">Nenhum registro.</p>`}
                             </div>`;
@@ -797,7 +843,6 @@
                                 <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Calcular Rota</button></div>
                             </form>
                             <div id="trip-result" class="mb-6 hidden"></div>
-
                             <form id="trip-log-form" class="space-y-4 p-4 border border-border-color rounded-lg mb-6">
                                 <h3 class="font-display text-lg">Registro Manual de Viagens</h3>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -807,7 +852,6 @@
                                 </div>
                                 <div class="text-right"><button type="submit" class="bg-brand hover:bg-brand-dark text-white font-bold py-2 px-5 rounded-lg">Adicionar Viagem</button></div>
                             </form>
-
                             <h3 class="font-display text-lg mb-3">Histórico de Viagens</h3>
                             <div class="space-y-2 max-h-60 overflow-y-auto pr-2">
                             ${sortedTrips.map(trip => `<div class="bg-background-color p-3 rounded-lg flex justify-between items-center text-sm">
@@ -861,7 +905,7 @@
             };
 
             const calculateTripDetails = async (origin, destination, fuelPrice) => {
-                if (MAPBOX_ACCESS_TOKEN === 'COLE_SEU_ACCESS_TOKEN_DO_MAPBOX_AQUI' || !MAPBOX_ACCESS_TOKEN) {
+                if (MAPBOX_ACCESS_TOKEN.includes('COLE_SEU') || !MAPBOX_ACCESS_TOKEN) {
                     showToast('Access Token do Mapbox não configurado.', 'error'); return;
                 }
                 const consumption = calculateAverageConsumption();
@@ -909,12 +953,50 @@
             };
 
             DOM.carModuleBtn.addEventListener('click', showCarModal);
+            
+            DOM.fuelLogModalContainer.addEventListener('click', (e) => {
+                if(e.target.classList.contains('fuel-modal-close-btn') || e.target.id === 'fuel-log-modal-container') {
+                    hideFuelLogModal();
+                }
+            });
+
+            DOM.fuelLogModalContainer.addEventListener('submit', async (e) => {
+                if (e.target.id === 'fuel-log-edit-form-inner') {
+                    e.preventDefault();
+                    
+                    const updatedLog = {
+                        id: currentEditingFuelLogId,
+                        date: document.getElementById('fuel-form-date').value,
+                        odometer: parseInt(document.getElementById('fuel-form-odometer').value),
+                        liters: parseFloat(document.getElementById('fuel-form-liters').value),
+                        totalValue: parseFloat(document.getElementById('fuel-form-total-value').value)
+                    };
+                    
+                    const fuelLogIndex = vehicleData.fuelHistory.findIndex(log => String(log.id) === String(currentEditingFuelLogId));
+                    if (fuelLogIndex > -1) {
+                        vehicleData.fuelHistory[fuelLogIndex] = updatedLog;
+                    }
+                    
+                    // ATUALIZADO: Apenas atualiza a despesa se ela existir
+                    const expenseIndex = expensesData.findIndex(exp => String(exp.id) === String(currentEditingFuelLogId));
+                    if(expenseIndex > -1) {
+                        expensesData[expenseIndex].date = updatedLog.date;
+                        expensesData[expenseIndex].value = updatedLog.totalValue;
+                    }
+                    
+                    await saveAppState();
+                    hideFuelLogModal();
+                    renderCarTab('fuel');
+                    renderMonthView();
+                    showToast('Abastecimento atualizado com sucesso!');
+                }
+            });
 
             DOM.carModalContainer.addEventListener('click', async e => {
                 if (e.target.classList.contains('modal-close-btn') || e.target.id === 'car-modal-container') hideCarModal();
 
-                if (e.target.closest('.tab-btn')) {
-                    const tabBtn = e.target.closest('.tab-btn');
+                const tabBtn = e.target.closest('.tab-btn');
+                if (tabBtn) {
                     document.querySelectorAll('#car-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
                     tabBtn.classList.add('active');
                     renderCarTab(tabBtn.dataset.tab);
@@ -927,8 +1009,57 @@
                     showExpenseModal({ category: 'Carro', description: description, value: value });
                 }
 
-                if (e.target.closest('.maint-done-btn')) {
-                    const id = e.target.closest('.maint-done-btn').dataset.id;
+                // NOVO: LÓGICA DO BOTÃO PARA LANÇAR DESPESA
+                const addExpenseBtn = e.target.closest('.add-fuel-as-expense-btn');
+                if(addExpenseBtn) {
+                    const logId = addExpenseBtn.dataset.id;
+                    const logToAdd = vehicleData.fuelHistory.find(log => String(log.id) === String(logId));
+                    const alreadyExists = expensesData.some(exp => String(exp.id) === String(logId));
+
+                    if (logToAdd && !alreadyExists) {
+                        const newExpense = {
+                            id: logToAdd.id,
+                            date: logToAdd.date,
+                            category: 'Carro',
+                            description: `Combustível${vehicleData.profile?.model ? ' - ' + vehicleData.profile.model : ''}`,
+                            value: logToAdd.totalValue
+                        };
+                        expensesData.push(newExpense);
+                        await saveAppState();
+                        showToast('Abastecimento lançado como despesa!');
+                        renderCarTab('fuel'); // Re-renderiza para atualizar o botão
+                        renderMonthView(); // Re-renderiza o painel principal
+                    } else if (alreadyExists) {
+                        showToast('Esta despesa já foi lançada.', 'warning');
+                    }
+                }
+
+                const editBtn = e.target.closest('.fuel-edit-btn');
+                if(editBtn) {
+                    const logId = editBtn.dataset.id;
+                    const logToEdit = vehicleData.fuelHistory.find(log => String(log.id) === String(logId));
+                    if(logToEdit) {
+                        showFuelLogModal(logToEdit);
+                    }
+                }
+
+                const deleteBtn = e.target.closest('.fuel-delete-btn');
+                if(deleteBtn) {
+                    const logIdToDelete = deleteBtn.dataset.id;
+                    if (confirm('Tem certeza que deseja excluir este abastecimento? Esta ação também removerá a despesa correspondente, se houver.')) {
+                        vehicleData.fuelHistory = vehicleData.fuelHistory.filter(log => String(log.id) !== String(logIdToDelete));
+                        expensesData = expensesData.filter(exp => String(exp.id) !== String(logIdToDelete));
+
+                        await saveAppState();
+                        renderCarTab('fuel');
+                        renderMonthView();
+                        showToast('Registro de abastecimento excluído.');
+                    }
+                }
+
+                const maintDoneBtn = e.target.closest('.maint-done-btn');
+                if (maintDoneBtn) {
+                    const id = maintDoneBtn.dataset.id;
                     const latestOdometer = getLatestOdometer();
                     const newOdometer = prompt(`Serviço realizado! Qual o KM atual do veículo?`, latestOdometer);
                     if (newOdometer && !isNaN(newOdometer)) {
@@ -939,8 +1070,9 @@
                         showToast('Manutenção registrada com sucesso!');
                     }
                 }
-                if (e.target.closest('.maint-delete-btn')) {
-                    const id = e.target.closest('.maint-delete-btn').dataset.id;
+                const maintDeleteBtn = e.target.closest('.maint-delete-btn');
+                if (maintDeleteBtn) {
+                    const id = maintDeleteBtn.dataset.id;
                     if (confirm('Tem certeza que deseja excluir este agendamento?')) {
                         vehicleData.maintenanceHistory = vehicleData.maintenanceHistory.filter(m => String(m.id) !== String(id));
                         await saveAppState();
@@ -971,10 +1103,15 @@
                             totalValue: parseFloat(document.getElementById('fuel-total-value').value)
                         };
                         if (!newFuelLog.odometer || !newFuelLog.liters || !newFuelLog.totalValue) { showToast('Preencha todos os campos.', 'error'); return; }
+                        
+                        // ATUALIZADO: Adiciona apenas ao histórico do veículo.
                         vehicleData.fuelHistory.push(newFuelLog);
-                        await saveAppState(); showToast('Abastecimento registrado!');
+                        
+                        await saveAppState();
+                        showToast('Abastecimento registrado!');
                         e.target.reset(); document.getElementById('fuel-date').value = toISODateString(new Date());
                         renderCarTab('fuel');
+                        // Não precisa mais renderizar o painel principal aqui
                         break;
                     }
                     case 'trip-log-form': {
@@ -1032,7 +1169,6 @@
 
 <script>
 (function () {
-  // Create icons via canvas
   function genIcon(size){
     try{
       var c=document.createElement('canvas'); c.width=c.height=size;
@@ -1050,7 +1186,6 @@
   var icon192 = genIcon(192);
   var icon512 = genIcon(512);
 
-  // Build manifest as blob
   var manifest = {
     name: "Painel Financeiro",
     short_name: "Financeiro",
@@ -1068,7 +1203,6 @@
   var link = document.getElementById('pwa-manifest');
   if (link) link.setAttribute('href', manifestURL);
 
-  // Create SW code as blob
   var swCode = `
     const CACHE_NAME = 'pf-cache-v1';
     const PRECACHE = [
@@ -1110,14 +1244,12 @@
   var swBlob = new Blob([swCode], {type:'text/javascript'});
   var swURL = URL.createObjectURL(swBlob);
 
-  // Register SW
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register(swURL, {scope: './'}).catch(console.error);
     });
   }
 
-  // Floating install button
   var fab = document.createElement('button');
   fab.id = 'pwa-install-fab';
   fab.textContent = 'Instalar';
@@ -1144,4 +1276,3 @@
 
 </body>
 </html>
-
