@@ -38,7 +38,7 @@
         .text-brand { color: var(--primary-color); }
         .hover\:bg-brand-dark:hover { background-color: var(--primary-color-dark); }
         .summary-card, .expense-card, .control-bar { background-color: var(--card-background-color); border: 1px solid var(--border-color); }
-        .expense-card:hover { transform: translateY(-3px) scale(1.01); cursor: pointer; }
+        .expense-card:hover { transform: translateY(-3px) scale(1.01); } /* Removido cursor pointer para dar lugar aos botões */
         .form-input, .form-select { background-color: var(--background-color); border: 1px solid var(--border-color); color: var(--text-color-primary); }
         .form-input:focus, .form-select:focus { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3); border-color: var(--primary-color); outline: none; }
         .modal-container { position: fixed; inset: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow-y: auto; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
@@ -54,10 +54,9 @@
         .progress-bar-inner { height: 100%; border-radius: 9999px; transition: width 0.5s ease-in-out; }
         .badge { font-size: 10px; padding: 2px 6px; border-radius: 9999px; border: 1px dashed var(--border-color); color: var(--text-color-secondary); }
         
-        /* */
         @media (max-width: 767px) {
             .mobile-scroll-container {
-                height: calc(100vh - 250px); /* Ajuste este valor conforme necessário */
+                height: calc(100vh - 250px);
             }
         }
     </style>
@@ -145,13 +144,12 @@
     </div>
 
     <div id="expense-modal-container" class="modal-container"></div>
+    <div id="duplicate-modal-container" class="modal-container"></div>
     <div id="car-modal-container" class="modal-container"></div>
     <div id="fuel-log-modal-container" class="modal-container"></div>
     <div id="toast-notification"></div>
 
     <script>
-        // O restante do seu código JavaScript permanece EXATAMENTE O MESMO.
-        // Nenhuma lógica de funcionalidade foi alterada.
         document.addEventListener('DOMContentLoaded', () => {
           (async () => {
             // =================================================================================
@@ -198,6 +196,7 @@
                 monthHeader: document.getElementById('month-header'), summarySection: document.getElementById('summary-section'),
                 categorySummarySection: document.getElementById('category-summary-section'), expensesList: document.getElementById('expenses-list'),
                 addExpenseBtn: document.getElementById('add-expense-btn'), modalContainer: document.getElementById('expense-modal-container'),
+                duplicateModalContainer: document.getElementById('duplicate-modal-container'),
                 salary1Input: document.getElementById('salary1'), salary2Input: document.getElementById('salary2'),
                 exportJsonBtn: document.getElementById('export-json-btn'), exportPdfBtn: document.getElementById('export-pdf-btn'),
                 exportExcelBtn: document.getElementById('export-excel-btn'), importInput: document.getElementById('import-file-input'),
@@ -274,7 +273,11 @@
                 DOM.monthHeader.textContent = new Date(year, month).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
 
                 const monthExpenses = expensesData
-                    .filter(e => new Date(e.date).getFullYear() === year && new Date(e.date).getMonth() === month)
+                    .filter(e => {
+                        const expenseDate = new Date(e.date);
+                        // Ajuste para considerar o fuso horário local e evitar problemas de um dia a menos
+                        return expenseDate.getFullYear() === year && expenseDate.getMonth() === month;
+                    })
                     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
                 const monthIncome = incomeData[monthKey] || { salary1: '', salary2: '' };
@@ -408,15 +411,23 @@
                     return;
                 }
                 DOM.expensesList.innerHTML = expenses.map(exp => `
-                    <div class="expense-card p-4 flex items-center gap-4" data-id="${exp.id}">
+                    <div class="expense-card p-4 flex items-center gap-4">
                         <div class="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full" style="background-color: ${CATEGORY_COLORS[exp.category]}20">
                             <span class="text-xl">${CATEGORY_ICONS[exp.category] || '📎'}</span>
                         </div>
-                        <div class="flex-grow">
+                        <div class="flex-grow cursor-pointer" data-id="${exp.id}" onclick="this.parentElement.querySelector('.edit-btn').click()">
                             <p class="font-semibold">${exp.description}</p>
                             <p class="text-sm text-text-secondary">${new Date(exp.date).toLocaleDateString('pt-BR', {day: '2-digit', month: 'long'})}</p>
                         </div>
-                        <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
+                        <div class="flex items-center gap-2">
+                            <p class="font-bold text-lg">${formatCurrency(exp.value)}</p>
+                            <button class="duplicate-expense-btn p-2 hover:bg-gray-700 rounded-full" title="Duplicar Despesa" data-id="${exp.id}">
+                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
+                            </button>
+                             <button class="edit-btn p-2 hover:bg-gray-700 rounded-full" title="Editar" data-id="${exp.id}">
+                               <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z"></path></svg>
+                            </button>
+                        </div>
                     </div>`).join('');
             };
 
@@ -436,11 +447,23 @@
                                 <h3 class="text-xl font-display">${isEditing ? 'Editar Lançamento' : 'Novo Lançamento'}</h3>
                                 <button type="button" class="modal-close-btn text-text-secondary hover:text-text-primary text-2xl font-bold">&times;</button>
                             </div>
-                            <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                                <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
-                                <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
-                                <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
-                                <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
+                            <div class="p-6 space-y-5">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                    <div><label for="form-date" class="block text-sm font-medium text-text-secondary mb-1">Data</label><input type="date" id="form-date" class="form-input w-full rounded-md p-2" required value="${date || toISODateString(currentDate)}"></div>
+                                    <div><label for="form-category" class="block text-sm font-medium text-text-secondary mb-1">Categoria</label><select id="form-category" class="form-select w-full rounded-md p-2" required>${categoryOptions}</select></div>
+                                    <div class="sm:col-span-2"><label for="form-description" class="block text-sm font-medium text-text-secondary mb-1">Descrição</label><input type="text" id="form-description" placeholder="Ex: Compras da semana" class="form-input w-full rounded-md p-2" required value="${description || ''}"></div>
+                                    <div class="sm:col-span-2"><label for="form-value" class="block text-sm font-medium text-text-secondary mb-1">Valor (R$)</label><input type="number" step="0.01" id="form-value" placeholder="150.00" class="form-input w-full rounded-md p-2" required value="${value || ''}"></div>
+                                </div>
+                                
+                                <div class="border-t border-border-color pt-4 ${isEditing ? 'hidden' : ''}">
+                                    <label class="flex items-center gap-3 cursor-pointer">
+                                        <input type="checkbox" id="is-installment-checkbox" class="h-4 w-4 rounded bg-background-color text-primary-color focus:ring-primary-color-dark">
+                                        <span class="text-sm font-medium text-text-secondary">É uma compra parcelada?</span>
+                                    </label>
+                                    <div id="installment-options" class="hidden mt-4 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                        <div><label for="form-installments" class="block text-sm font-medium text-text-secondary mb-1">Nº de Parcelas</label><input type="number" id="form-installments" class="form-input w-full" min="2" placeholder="12"></div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="flex justify-between items-center p-4 bg-background-color rounded-b-xl">
                                 ${isEditing ? '<button type="button" id="delete-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg">Excluir</button>' : '<div></div>'}
@@ -454,6 +477,15 @@
                 DOM.modalContainer.classList.add('visible');
                 DOM.body.classList.add('modal-open-body');
                 setTimeout(() => document.getElementById('form-description').focus(), 50);
+
+                // Adiciona o listener para o checkbox de parcelamento
+                const installmentCheckbox = document.getElementById('is-installment-checkbox');
+                const installmentOptions = document.getElementById('installment-options');
+                if (installmentCheckbox) {
+                    installmentCheckbox.addEventListener('change', () => {
+                        installmentOptions.classList.toggle('hidden', !installmentCheckbox.checked);
+                    });
+                }
             };
 
             const hideExpenseModal = () => {
@@ -461,6 +493,76 @@
                 DOM.modalContainer.classList.remove('visible');
                 DOM.body.classList.remove('modal-open-body');
                 setTimeout(() => { DOM.modalContainer.innerHTML = ''; }, 300);
+            };
+
+            // NOVO: Modal e lógica para Duplicar/Recorrência
+            const showDuplicateModal = (expense) => {
+                const today = new Date();
+                const nextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0).toISOString().slice(0, 7); // Formato YYYY-MM
+                
+                const modalHTML = `
+                <div class="bg-card-background-color rounded-xl shadow-2xl w-full max-w-md border border-border-color">
+                    <div class="p-5 border-b border-border-color">
+                        <h3 class="text-xl font-display">Duplicar Lançamento</h3>
+                        <p class="text-sm text-text-secondary truncate">De: ${expense.description}</p>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <button id="duplicate-next-month-btn" class="w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Apenas para o próximo mês</button>
+                        <div class="border-t border-border-color my-4"></div>
+                        <div>
+                            <label for="duplicate-until-date" class="block text-sm font-medium text-text-secondary mb-1">Repetir mensalmente até:</label>
+                            <input type="month" id="duplicate-until-date" min="${nextMonth}" class="form-input w-full">
+                        </div>
+                        <button id="duplicate-confirm-btn" class="w-full text-center bg-brand hover:bg-brand-dark text-white font-bold py-2 px-4 rounded-lg">Confirmar Repetição</button>
+                    </div>
+                    <div class="p-4 bg-background-color rounded-b-xl text-right">
+                         <button type="button" class="modal-close-btn bg-card-background-color hover:bg-gray-700 border border-border-color font-medium py-2 px-4 rounded-lg">Cancelar</button>
+                    </div>
+                </div>`;
+                DOM.duplicateModalContainer.innerHTML = modalHTML;
+                DOM.duplicateModalContainer.classList.add('visible');
+
+                document.getElementById('duplicate-next-month-btn').onclick = async () => {
+                    const originalDate = new Date(expense.date);
+                    const newDate = new Date(originalDate.setMonth(originalDate.getMonth() + 1));
+                    const newExpense = { ...expense, id: Date.now(), date: toISODateString(newDate) };
+                    expensesData.push(newExpense);
+                    await saveAppState();
+                    hideDuplicateModal();
+                    renderMonthView();
+                    showToast('Despesa duplicada para o próximo mês!');
+                };
+                
+                document.getElementById('duplicate-confirm-btn').onclick = async () => {
+                    const untilDateStr = document.getElementById('duplicate-until-date').value;
+                    if (!untilDateStr) {
+                        showToast('Por favor, selecione uma data final.', 'error');
+                        return;
+                    }
+                    const [year, month] = untilDateStr.split('-');
+                    const endDate = new Date(year, month - 1, new Date(expense.date).getDate() + 1);
+                    
+                    let currentDate = new Date(expense.date);
+                    let count = 0;
+                    while (true) {
+                        currentDate.setMonth(currentDate.getMonth() + 1);
+                        if (currentDate > endDate) break;
+                        
+                        const newExpense = { ...expense, id: Date.now() + count, date: toISODateString(new Date(currentDate)) };
+                        expensesData.push(newExpense);
+                        count++;
+                    }
+                    if (count > 0) {
+                        await saveAppState();
+                        renderMonthView();
+                        showToast(`${count} despesa(s) recorrente(s) criada(s)!`);
+                    }
+                    hideDuplicateModal();
+                };
+            };
+            const hideDuplicateModal = () => {
+                DOM.duplicateModalContainer.classList.remove('visible');
+                setTimeout(() => { DOM.duplicateModalContainer.innerHTML = ''; }, 300);
             };
             
             const showFuelLogModal = (logData = {}) => {
@@ -512,11 +614,17 @@
             DOM.prevMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderMonthView(); });
             DOM.nextMonthBtn.addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderMonthView(); });
             DOM.addExpenseBtn.addEventListener('click', () => showExpenseModal({}));
+            
             DOM.expensesList.addEventListener('click', (e) => {
-                const card = e.target.closest('.expense-card');
-                if (card) {
-                    const expense = expensesData.find(exp => String(exp.id) === String(card.dataset.id));
+                const editBtn = e.target.closest('.edit-btn');
+                if (editBtn) {
+                    const expense = expensesData.find(exp => String(exp.id) === String(editBtn.dataset.id));
                     if (expense) showExpenseModal(expense);
+                }
+                const duplicateBtn = e.target.closest('.duplicate-expense-btn');
+                if (duplicateBtn) {
+                    const expense = expensesData.find(exp => String(exp.id) === String(duplicateBtn.dataset.id));
+                    if (expense) showDuplicateModal(expense);
                 }
             });
 
@@ -533,27 +641,68 @@
                     }
                 }
             });
+            
+            DOM.duplicateModalContainer.addEventListener('click', (e) => {
+                 if (e.target.classList.contains('modal-close-btn') || e.target.id === 'duplicate-modal-container') {
+                    hideDuplicateModal();
+                }
+            });
 
             DOM.modalContainer.addEventListener('submit', async (e) => {
                 if (e.target.id === 'expense-form-inner') {
                     e.preventDefault();
-                    const d = {
-                        id: currentEditingId || Date.now(),
-                        date: document.getElementById('form-date').value,
-                        description: document.getElementById('form-description').value,
-                        category: document.getElementById('form-category').value,
-                        value: parseFloat(document.getElementById('form-value').value) || 0
-                    };
-                    if (currentEditingId) {
-                        const i = expensesData.findIndex(exp => String(exp.id) === String(currentEditingId));
-                        if (i > -1) expensesData[i] = d;
-                    } else {
-                        expensesData.push(d);
+                    
+                    const isInstallment = document.getElementById('is-installment-checkbox')?.checked;
+                    
+                    // Lógica de Parcelamento
+                    if (isInstallment && !currentEditingId) {
+                        const totalInstallments = parseInt(document.getElementById('form-installments').value);
+                        if (!totalInstallments || totalInstallments < 2) {
+                            showToast('Número de parcelas inválido.', 'error');
+                            return;
+                        }
+                        
+                        const baseDescription = document.getElementById('form-description').value;
+                        const baseValue = parseFloat(document.getElementById('form-value').value) || 0;
+                        const baseCategory = document.getElementById('form-category').value;
+                        const startDate = new Date(document.getElementById('form-date').value + 'T12:00:00'); // Adiciona hora para evitar problemas de fuso
+
+                        for (let i = 1; i <= totalInstallments; i++) {
+                            const installmentDate = new Date(startDate.getFullYear(), startDate.getMonth() + (i - 1), startDate.getDate());
+                            const newExpense = {
+                                id: Date.now() + i,
+                                date: toISODateString(installmentDate),
+                                description: `${baseDescription} (${i}/${totalInstallments})`,
+                                category: baseCategory,
+                                value: baseValue
+                            };
+                            expensesData.push(newExpense);
+                        }
+                        
+                        await saveAppState();
+                        renderMonthView();
+                        hideExpenseModal();
+                        showToast(`${totalInstallments} parcelas adicionadas com sucesso!`, 'success');
+
+                    } else { // Lógica Padrão (salvar um ou editar)
+                        const d = {
+                            id: currentEditingId || Date.now(),
+                            date: document.getElementById('form-date').value,
+                            description: document.getElementById('form-description').value,
+                            category: document.getElementById('form-category').value,
+                            value: parseFloat(document.getElementById('form-value').value) || 0
+                        };
+                        if (currentEditingId) {
+                            const i = expensesData.findIndex(exp => String(exp.id) === String(currentEditingId));
+                            if (i > -1) expensesData[i] = d;
+                        } else {
+                            expensesData.push(d);
+                        }
+                        await saveAppState();
+                        renderMonthView();
+                        hideExpenseModal();
+                        showToast('Lançamento salvo com sucesso!', 'success');
                     }
-                    await saveAppState();
-                    renderMonthView();
-                    hideExpenseModal();
-                    showToast('Lançamento salvo com sucesso!', 'success');
                 }
             });
 
@@ -667,7 +816,7 @@
             });
             
             // =================================================================================
-            // MÓDULO VEICULAR
+            // MÓDULO VEICULAR (Lógica existente mantida)
             // =================================================================================
             const MAPBOX_ACCESS_TOKEN = 'pk.eyJ1IjoiamVmZmVyc29uMjJncyIsImEiOiJjbWZrZWkxY3YwZGlrMmpwdnM0d3E2aDFiIn0.6zQFqfYSKu4Pjo6nCKrEIA';
 
@@ -1281,5 +1430,3 @@
 
 </body>
 </html>
-
-
